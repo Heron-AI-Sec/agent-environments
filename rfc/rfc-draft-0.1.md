@@ -20,7 +20,7 @@
 
 `This is a static graph declaration for the components of the model topology. This enables automated translation to infrastructure as code templates (e.g. Terraform, OpenTofu, CloudFormation scripts).`
 
-* **`Networks (Edges):`** `Logical broadcast domains or subnets.`  
+* **`Networks (Edges):`** `Logical broadcast domains or subnets.`
 * **`Nodes (Vertices):`** `The logical representation of a host, router, or switch.`
 
 ### **`Resources (Infrastructure Bindings)`**
@@ -79,7 +79,7 @@
 | `ip_address` | `String` | `Static IP address, if specified.` | `192.168.1.1/24` |
 | `hw_address` | `String` | `Hardware (e.g. MAC) address.` | `DE:AD:BE:EF` |
 
-#### 
+####
 
 #### `Edges`
 
@@ -91,7 +91,7 @@
 | `latency` | `String` | `Simulated delay.` | `50ms` |
 | `packet_loss` | `Float` | `Percentage of dropped packets.` | `0.05` |
 
-## 
+##
 
 ### `Resources`
 
@@ -165,7 +165,7 @@
 
 #### **`YAML File Example (WIP)`**
 
-### 
+###
 
 | `runtime:   agents:     - id: red_team_llm_01       type: llm_autonomous       initial_node: external_attacker_node       goal: "Discover internal databases and exfiltrate the 'attendees.db' file."       observation_space:         - stdout         - stderr       action_space:         - execute_shell     - id: blue_team_rl_bot       type: rl_agent       vantage_point: core_switch       goal: "Maintain uptime of HTTP services while blocking anomalous lateral movement."       observation_space:         - network_pcap         - syslog       action_space:         - modify_config  # ACLs or firewall rules   objectives:     - id: red_flag_captured       condition: "file_exists:/tmp/exfiltrated_attendees.db:external_attacker_node"       reward: 100.0     - id: blue_uptime_maintained       condition: "service_responsive:http:web_server_01"       reward: 1.0  # continuous reward per tick   phases:     - name: autonomous_engagement       duration: "3600s"       actions:         - type: start_agent_loop           target: external_attacker_node           payload:             agent_id: red_team_llm_01         - type: start_agent_loop           target: core_switch           payload:             agent_id: blue_team_rl_bot`  |
 | :---- |
@@ -180,4 +180,4 @@ List every repo that would need changes to implement this RFC.
 
 ## Consequences
 
-What becomes easier or harder as a result of this change? What are the migration requirements?  
+What becomes easier or harder as a result of this change? What are the migration requirements?
