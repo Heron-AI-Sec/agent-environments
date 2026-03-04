@@ -108,20 +108,10 @@ switching fabrics.
 #### Private Service Access
 
 For cloud deployments, private service access enables connectivity to managed
-services without traversing the public internet. Each provider implements this
-differently:
+services without traversing the public internet. Supported endpoints:
+`remote_management`, `storage`, `file_storage`, `secrets`, `logs`.
 
-- **AWS**: VPC Endpoints (Interface/Gateway) via PrivateLink
-- **GCP**: Private Service Connect
-- **Azure**: Private Endpoints via Private Link
-
-| Endpoint            | AWS                             | GCP            | Azure         | Description           |
-| :------------------ | :------------------------------ | :------------- | :------------ | :-------------------- |
-| `remote_management` | SSM, SSM Messages, EC2 Messages | IAP            | Bastion       | Remote shell access   |
-| `storage`           | S3                              | Cloud Storage  | Blob Storage  | Object storage access |
-| `file_storage`      | EFS                             | Filestore      | Azure Files   | Shared file systems   |
-| `secrets`           | Secrets Manager                 | Secret Manager | Key Vault     | Secrets access        |
-| `logs`              | CloudWatch Logs                 | Cloud Logging  | Log Analytics | Log shipping          |
+See [Appendix A](#appendix-a-provider-mappings) for provider-specific service mappings.
 
 ### Networks Example
 
@@ -169,19 +159,9 @@ firewalls within the environment.
 
 #### Node Roles
 
-Standard roles used in cyber ranges:
-
-| Role                | Description                                                    |
-| :------------------ | :------------------------------------------------------------- |
-| `domain_controller` | Active Directory domain controller                             |
-| `server`            | General-purpose server                                         |
-| `workstation`       | End-user workstation                                           |
-| `c2_server`         | Command & Control server (e.g., Sliver, Mythic, Cobalt Strike) |
-| `redirector`        | C2 traffic redirector                                          |
-| `attacker`          | Offensive operator workstation                                 |
-| `target`            | Standalone target system                                       |
-| `router`            | Network routing device                                         |
-| `firewall`          | Network security device                                        |
+Standard roles: `domain_controller`, `server`, `workstation`, `c2_server`,
+`redirector`, `attacker`, `target`, `router`, `firewall`. Custom roles are
+also supported.
 
 #### NetworkInterface Object
 
@@ -380,21 +360,10 @@ Defines IAM/service account policies to attach to instances.
 
 #### Standard Capabilities
 
-| Capability          | Description                            |
-| :------------------ | :------------------------------------- |
-| `remote_management` | Cloud shell access (SSM, IAP, Bastion) |
-| `metrics_logs`      | Metrics and log shipping               |
-| `storage_read`      | Read from object storage               |
-| `storage_full`      | Full access to object storage          |
-| `secrets_read`      | Read secrets from secret manager       |
+Abstract capabilities resolved to provider-specific policies at deploy time:
+`remote_management`, `metrics_logs`, `storage_read`, `storage_full`, `secrets_read`.
 
-Common managed policies for range nodes:
-
-| Capability        | AWS                            | GCP                                | Azure                          |
-| :---------------- | :----------------------------- | :--------------------------------- | :----------------------------- |
-| Remote management | `AmazonSSMManagedInstanceCore` | `roles/iap.tunnelResourceAccessor` | `Virtual Machine User Login`   |
-| Metrics/logs      | `CloudWatchAgentServerPolicy`  | `roles/logging.logWriter`          | `Monitoring Metrics Publisher` |
-| Storage read      | `AmazonS3ReadOnlyAccess`       | `roles/storage.objectViewer`       | `Storage Blob Data Reader`     |
+See [Appendix A](#appendix-a-provider-mappings) for provider-specific policy mappings.
 
 ### Bindings
 
@@ -744,14 +713,8 @@ Collection points define where telemetry is gathered from nodes in the range.
 
 #### Collection Types
 
-| Type               | Description                | Typical Sources             |
-| :----------------- | :------------------------- | :-------------------------- |
-| `windows_security` | Windows Security Event Log | Domain controllers, servers |
-| `syslog`           | Linux syslog / journald    | Linux hosts                 |
-| `kubernetes_logs`  | Container stdout/stderr    | Kubernetes pods             |
-| `network_pcap`     | Packet capture             | Switches, TAPs              |
-| `otel_spans`       | OpenTelemetry traces       | Instrumented applications   |
-| `systemd_journal`  | Systemd journal logs       | Linux hosts                 |
+Supported types: `windows_security`, `syslog`, `kubernetes_logs`, `network_pcap`,
+`otel_spans`, `systemd_journal`.
 
 ### Sinks
 
@@ -769,33 +732,18 @@ patterns for local analysis and external platform integration.
 
 ### Span Dimensions
 
-Span dimensions define custom attributes extracted from traces for metrics
-generation and correlation. These are critical for attack analysis.
+Custom span attributes for attack correlation and metrics generation. Common
+dimensions include:
 
-| Dimension                | Description                      | Example Values                                        |
-| :----------------------- | :------------------------------- | :---------------------------------------------------- |
-| `mitre.tactic`           | ATT&CK tactic name.              | `credential-access`, `lateral-movement`               |
-| `mitre.technique.id`     | ATT&CK technique ID.             | `T1558.003`, `T1003.006`                              |
-| `mitre.technique.name`   | ATT&CK technique name.           | `Kerberoasting`, `DCSync`                             |
-| `attack_team`            | Team performing the action.      | `red`, `blue`                                         |
-| `attack_phase`           | Current phase of the attack.     | `reconnaissance`, `exploitation`, `post-exploitation` |
-| `attack_operation_id`    | Links traces to attack campaign. | UUID                                                  |
-| `attack_target_host`     | Target hostname.                 | `dc01`                                                |
-| `attack_target_domain`   | Target domain.                   | `corp.local`                                          |
-| `service.namespace`      | Kubernetes namespace.            | `attack-simulation`                                   |
-| `deployment.environment` | Environment name.                | `dev`, `staging`, `prod`                              |
+- **MITRE ATT&CK**: `mitre.tactic`, `mitre.technique.id`, `mitre.technique.name`
+- **Attack context**: `attack_team`, `attack_phase`, `attack_operation_id`
+- **Targeting**: `attack_target_host`, `attack_target_domain`
+- **Infrastructure**: `service.namespace`, `deployment.environment`
 
 ### Storage Tiers
 
-Storage tiers define retention policies for different data temperatures.
-
-| Property | Type   | Required | Description                   | Example     |
-| :------- | :----- | :------- | :---------------------------- | :---------- |
-| `hot`    | Object | No       | Fast storage for recent data. | Local SSD   |
-| `warm`   | Object | No       | Cost-effective storage.       | S3 Standard |
-| `cold`   | Object | No       | Archive storage.              | S3 Glacier  |
-
-#### Storage Tier Object
+Storage tiers (`hot`, `warm`, `cold`) define retention policies for different
+data temperatures. Each tier specifies:
 
 | Property    | Type   | Required | Description            | Example                            |
 | :---------- | :----- | :------- | :--------------------- | :--------------------------------- |
@@ -978,41 +926,18 @@ exposing them to the public internet.
 
 #### Provider-Specific Configuration
 
-Each VPN provider may have additional settings:
-
-**Tailscale:**
+Each VPN provider may have additional settings in the `config` object. Example
+for Tailscale:
 
 ```yaml
----
 config:
   tailnet: example.com
   acl_tags: [tag:range, tag:operators]
   funnel: false
 ```
 
-**WireGuard:**
-
-```yaml
----
-config:
-  interface: wg0
-  listen_port: 51820
-  private_key: secret:wg-private-key
-  peers:
-    - public_key: "..."
-      allowed_ips: [10.0.0.0/16]
-      endpoint: vpn.example.com:51820
-```
-
-**Nebula:**
-
-```yaml
----
-config:
-  ca_cert: secret:nebula-ca
-  node_cert: secret:nebula-node-cert
-  lighthouse: vpn.example.com:4242
-```
+Other providers (WireGuard, Nebula, ZeroTier) follow similar patterns with
+provider-specific fields.
 
 ### Operator Access
 
@@ -1029,7 +954,8 @@ operations, or debugging.
 
 #### Cloud Shell Configuration
 
-Cloud-managed shell access enables secure connections without SSH keys or open ports.
+Cloud-managed shell access enables secure connections without SSH keys or open
+ports. Type maps to provider services: `ssm` (AWS), `iap` (GCP), `bastion` (Azure).
 
 | Property          | Type    | Required | Description                       | Example                 |
 | :---------------- | :------ | :------- | :-------------------------------- | :---------------------- |
@@ -1037,14 +963,6 @@ Cloud-managed shell access enables secure connections without SSH keys or open p
 | `enabled`         | Boolean | Yes      | Enable cloud shell access.        | `true`                  |
 | `session_logging` | Boolean | No       | Log sessions to cloud storage.    | `true`                  |
 | `log_destination` | String  | No       | Bucket/location for session logs. | `range-session-logs`    |
-
-**Provider mapping:**
-
-| Provider | Type      | Service                         |
-| :------- | :-------- | :------------------------------ |
-| AWS      | `ssm`     | Systems Manager Session Manager |
-| GCP      | `iap`     | Identity-Aware Proxy            |
-| Azure    | `bastion` | Azure Bastion                   |
 
 #### VPN Operator Configuration
 
@@ -1147,377 +1065,6 @@ connectivity:
 
 ---
 
-## Complete Example
-
-```yaml
----
-apiVersion: aces.io/v1alpha1
-kind: CyberRange
-metadata:
-  name: ad-attack-range
-  description: "Active Directory attack simulation range"
-  version: "1.0.0"
-
-# Logical groupings
-groups:
-  ad_lab:
-    description: "Active Directory lab hosts"
-    type: deployment
-    provisioner: terraform
-
-  domain_controllers:
-    description: "Active Directory domain controllers"
-    type: role-based
-
-  c2_servers:
-    description: "Command & Control servers"
-    type: infrastructure
-    members: [sliver, mythic]
-
-  redirectors:
-    description: "C2 traffic redirectors"
-    type: infrastructure
-    members: [redir-01]
-
-  attackers:
-    description: "Offensive operator workstations"
-    type: role-based
-
-  windows:
-    description: "All Windows hosts"
-    type: os-based
-
-# Network topology
-topology:
-  networks:
-    - name: range-vpc
-      cidr: 10.0.0.0/16
-      routing: nat
-      private_service_access: [remote_management, storage, file_storage]
-
-    - name: corp-subnet
-      cidr: 10.0.10.0/24
-      routing: isolated
-
-    - name: dmz-subnet
-      cidr: 10.0.20.0/24
-      routing: isolated
-
-  nodes:
-    # Domain Controllers
-    - name: dc01
-      type: host
-      role: domain_controller
-      computer_name: DC01
-      friendly_name: "Primary Domain Controller"
-      os: windows
-      os_version: "2019"
-      domain: corp.local
-      tier: critical
-      groups: [ad_lab, domain_controllers, windows]
-      services: [ldap, kerberos, dns, smb]
-      provisioner: terraform
-      provisioner_id: dc01
-      owner: infra-team
-      interfaces:
-        - name: eth0
-          network: corp-subnet
-          ip_address: 10.0.10.10/24
-
-    - name: dc02
-      type: host
-      role: domain_controller
-      computer_name: DC02
-      friendly_name: "Secondary Domain Controller"
-      os: windows
-      os_version: "2019"
-      domain: corp.local
-      tier: critical
-      groups: [ad_lab, domain_controllers, windows]
-      services: [ldap, kerberos, dns, smb]
-      interfaces:
-        - name: eth0
-          network: corp-subnet
-          ip_address: 10.0.10.11/24
-
-    # C2 Servers
-    - name: sliver
-      type: host
-      role: c2_server
-      computer_name: sliver
-      friendly_name: "Sliver C2 Server"
-      os: linux
-      os_version: "22.04"
-      os_distribution: ubuntu
-      tier: high
-      groups: [c2_servers]
-      services: [sliver-server, https, nginx]
-      owner: red-team
-      features: [multiplayer]
-      interfaces:
-        - name: eth0
-          network: range-vpc
-          ip_address: 10.0.4.100/24
-
-    # C2 Redirectors
-    - name: redir-01
-      type: host
-      role: redirector
-      computer_name: redir-01
-      friendly_name: "HTTPS Redirector"
-      os: linux
-      os_version: "22.04"
-      os_distribution: ubuntu
-      tier: low
-      groups: [redirectors]
-      services: [nginx, https]
-      owner: red-team
-      notes: "Fronts sliver C2 traffic, terminates TLS"
-      interfaces:
-        - name: eth0
-          network: dmz-subnet
-          ip_address: 10.0.20.50/24
-
-    # Attacker Workstations
-    - name: kali-01
-      type: host
-      role: attacker
-      computer_name: kali-01
-      friendly_name: "Operator Workstation 1"
-      os: linux
-      os_distribution: kali
-      tier: low
-      groups: [attackers]
-      owner: red-team
-      features: [vnc_access, pre_installed_tools]
-      notes: "Primary operator workstation"
-      interfaces:
-        - name: eth0
-          network: range-vpc
-          dhcp: true
-
-# Resource configuration
-resources:
-  profiles:
-    - name: dc-standard
-      instance_type: t3.medium
-      volume:
-        size: 100Gi
-        type: gp3
-        encrypted: true
-
-    - name: c2-server
-      instance_type: t3.large
-      volume:
-        size: 100Gi
-        type: gp3
-        encrypted: true
-
-    - name: redirector
-      instance_type: t3.micro
-      volume:
-        size: 20Gi
-        type: gp3
-
-  image_filters:
-    - name: windows-2019-base
-      owners: [amazon]
-      most_recent: true
-      filters:
-        name: "Windows_Server-2019-English-Full-Base-*"
-
-    - name: ubuntu-22.04
-      owners: [099720109477]
-      most_recent: true
-      filters:
-        name: "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
-
-    - name: kali-latest
-      owners: [679593333241]
-      most_recent: true
-      filters:
-        name: "kali-linux-*"
-
-  instance_policies:
-    - name: range-node-base
-      capabilities: [remote_management, metrics_logs]
-
-  security_groups:
-    - name: internal-ad
-      description: "Internal AD traffic"
-      ingress:
-        - protocol: "-1"
-          cidr_blocks: [10.0.0.0/16, 172.16.0.0/16]
-
-    - name: redirector-public
-      description: "C2 redirector - accepts implant callbacks"
-      ingress:
-        - protocol: tcp
-          from_port: 443
-          to_port: 443
-          cidr_blocks: [0.0.0.0/0]
-          description: "HTTPS callbacks from implants"
-        - protocol: tcp
-          from_port: 80
-          to_port: 80
-          cidr_blocks: [0.0.0.0/0]
-          description: "HTTP callbacks (redirects to HTTPS)"
-
-  bindings:
-    - node: dc01
-      image_filter: windows-2019-base
-      profile: dc-standard
-      instance_policy: range-node-base
-      security_groups: [internal-ad]
-
-    - node: dc02
-      image_filter: windows-2019-base
-      profile: dc-standard
-      instance_policy: range-node-base
-      security_groups: [internal-ad]
-
-    - node: sliver
-      image_filter: ubuntu-22.04
-      profile: c2-server
-      instance_policy: range-node-base
-      security_groups: [internal-ad]
-
-    - node: redir-01
-      image_filter: ubuntu-22.04
-      profile: redirector
-      instance_policy: range-node-base
-      security_groups: [redirector-public]
-
-    - node: kali-01
-      image_filter: kali-latest
-      profile: dc-standard
-      instance_policy: range-node-base
-
-# Post-deployment provisioning
-provisioning:
-  method: cloud_shell_ansible
-
-  playbooks:
-    - name: dc-setup
-      path: ansible/windows/dc_setup.yml
-      host_type: windows
-      groups: [domain_controllers]
-
-    - name: sliver-setup
-      path: ansible/linux/sliver.yml
-      host_type: linux
-      nodes: [sliver]
-      extra_vars:
-        sliver_version: "1.5.42"
-
-# Agent execution platform
-agent_platform:
-  type: kubernetes
-  name: agent-cluster
-  network:
-    cidr: 172.16.0.0/16
-    pod_cidr: 100.64.0.0/16
-    namespace: aces-agents
-  orchestrator:
-    type: ray
-  storage:
-    type: redis
-    url: redis://redis.aces-agents.svc:6379
-
-# Observability infrastructure
-telemetry:
-  tracing:
-    backend: tempo
-    endpoint: "http://tempo.observability:4318"
-    metrics_generator: true
-
-  metrics:
-    backend: prometheus
-    endpoint: "http://prometheus.observability:9090"
-    retention: 30d
-
-  logging:
-    backend: loki
-    endpoint: "http://loki-gateway.observability:80"
-    retention: 14d
-
-  agent:
-    type: alloy
-    version: "1.6.0"
-
-  collection_points:
-    - type: windows_security
-      groups: [domain_controllers]
-      event_ids: [4624, 4625, 4662, 4768, 4769]
-      format: ocsf
-
-    - type: kubernetes_logs
-      namespace: attack-simulation
-
-    - type: otel_spans
-      namespace: attack-simulation
-
-  sinks:
-    - name: local-tempo
-      type: otlp
-      endpoint: "http://tempo.observability:4317"
-
-    - name: platform-traces
-      type: otlp
-      endpoint: "https://platform.example.com/api/otel/traces"
-      credentials: secret:platform-api-key
-
-  span_dimensions:
-    - mitre.tactic
-    - mitre.technique.id
-    - attack_team
-    - attack_phase
-    - attack_operation_id
-    - service.namespace
-
-  storage:
-    hot:
-      type: local
-      retention: 24h
-    warm:
-      type: s3
-      retention: 30d
-      bucket: range-telemetry
-
-# Network connectivity
-connectivity:
-  overlay:
-    type: tailscale
-    auth_key: secret:vpn-auth-key
-    network_name: example.com
-    acl_tags: [tag:range, tag:operators, tag:agents]
-    advertise_routes: [10.0.0.0/16]
-
-  operator_access:
-    methods: [vpn, cloud_shell]
-    cloud_shell:
-      type: ssm # or: iap, bastion
-      enabled: true
-      session_logging: true
-    vpn:
-      enabled: true
-      ssh: true
-
-  connections:
-    - name: agents-to-targets
-      type: tailscale
-      source:
-        environment: agent-cluster
-        cidr: 172.16.0.0/16
-      destination:
-        environment: ad-attack-range
-        cidr: 10.0.0.0/16
-      policy:
-        direction: egress_only
-```
-
----
-
 ## Alternatives Considered
 
 1. **JSON Schema Only**: Rejected because YAML is more human-readable and
@@ -1525,7 +1072,7 @@ connectivity:
 2. **Pulumi/CDK-style Imperative**: Rejected because declarative specs are
    easier to version, diff, and validate.
 3. **Combined Range + Experiment**: Rejected to enable range reuse across
-   multiple experiments (see RFC-0002).
+   multiple experiments.
 4. **Embedded Provisioning in Bindings**: Rejected to keep resource mapping
    separate from configuration management.
 
@@ -1563,8 +1110,24 @@ connectivity:
 
 ---
 
-## Cross-References
+## Appendix A: Provider Mappings
 
-| Document                           | Relationship                                                                             |
-| ---------------------------------- | ---------------------------------------------------------------------------------------- |
-| RFC-0002: Experiment Specification | Defines agents, objectives, detection rules, and runtime that execute against this range |
+This appendix contains cloud provider-specific service and policy mappings.
+
+### Provider-Specific Private Service Access
+
+| Endpoint            | AWS                             | GCP            | Azure         |
+| :------------------ | :------------------------------ | :------------- | :------------ |
+| `remote_management` | SSM, SSM Messages, EC2 Messages | IAP            | Bastion       |
+| `storage`           | S3                              | Cloud Storage  | Blob Storage  |
+| `file_storage`      | EFS                             | Filestore      | Azure Files   |
+| `secrets`           | Secrets Manager                 | Secret Manager | Key Vault     |
+| `logs`              | CloudWatch Logs                 | Cloud Logging  | Log Analytics |
+
+### Instance Policy Capabilities
+
+| Capability          | AWS                            | GCP                                | Azure                          |
+| :------------------ | :----------------------------- | :--------------------------------- | :----------------------------- |
+| `remote_management` | `AmazonSSMManagedInstanceCore` | `roles/iap.tunnelResourceAccessor` | `Virtual Machine User Login`   |
+| `metrics_logs`      | `CloudWatchAgentServerPolicy`  | `roles/logging.logWriter`          | `Monitoring Metrics Publisher` |
+| `storage_read`      | `AmazonS3ReadOnlyAccess`       | `roles/storage.objectViewer`       | `Storage Blob Data Reader`     |
