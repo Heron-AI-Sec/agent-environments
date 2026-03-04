@@ -63,6 +63,7 @@ and the infrastructure pillars.
 ### Example
 
 ```yaml
+---
 apiVersion: aces.io/v1alpha1
 kind: CyberRange
 metadata:
@@ -95,19 +96,24 @@ or emulation will occur.
 Networks represent broadcast domains, local area networks, subnets, and
 switching fabrics.
 
-| Property            | Type    | Required | Description                                      | Example                        |
-| :------------------ | :------ | :------- | :----------------------------------------------- | :----------------------------- |
-| `name`              | String  | Yes      | Unique identifier for the network.               | `corporate-lan`                |
-| `cidr`              | String  | Yes      | IPv4/IPv6 subnet.                                | `10.0.0.0/16`                  |
-| `routing`           | String  | No       | The routing mode.                                | `isolated`, `nat`, `bridged`   |
-| `vlan_id`           | Integer | No       | Optional VLAN identifier.                        | `100`                          |
-| `secondary_cidr`    | String  | No       | Secondary CIDR block (e.g., for pod networking). | `100.64.0.0/16`                |
-| `private_endpoints` | Array   | No       | Private endpoints for cloud services.            | `[remote_management, storage]` |
+| Property                 | Type    | Required | Description                                      | Example                        |
+| :----------------------- | :------ | :------- | :----------------------------------------------- | :----------------------------- |
+| `name`                   | String  | Yes      | Unique identifier for the network.               | `corporate-lan`                |
+| `cidr`                   | String  | Yes      | IPv4/IPv6 subnet.                                | `10.0.0.0/16`                  |
+| `routing`                | String  | No       | The routing mode.                                | `isolated`, `nat`, `bridged`   |
+| `vlan_id`                | Integer | No       | Optional VLAN identifier.                        | `100`                          |
+| `secondary_cidr`         | String  | No       | Secondary CIDR block (e.g., for pod networking). | `100.64.0.0/16`                |
+| `private_service_access` | Array   | No       | Managed service connectivity (private access).   | `[remote_management, storage]` |
 
-#### Private Endpoints
+#### Private Service Access
 
-For cloud deployments, private endpoints enable connectivity to managed
-services without traversing the public internet.
+For cloud deployments, private service access enables connectivity to managed
+services without traversing the public internet. Each provider implements this
+differently:
+
+- **AWS**: VPC Endpoints (Interface/Gateway) via PrivateLink
+- **GCP**: Private Service Connect
+- **Azure**: Private Endpoints via Private Link
 
 | Endpoint            | AWS                             | GCP            | Azure         | Description           |
 | :------------------ | :------------------------------ | :------------- | :------------ | :-------------------- |
@@ -120,13 +126,14 @@ services without traversing the public internet.
 ### Networks Example
 
 ```yaml
+---
 topology:
   networks:
     - name: range-vpc
       cidr: 10.0.0.0/16
       secondary_cidr: 100.64.0.0/16 # For Kubernetes pod networking
       routing: nat
-      private_endpoints: [remote_management, storage, file_storage]
+      private_service_access: [remote_management, storage, file_storage]
 
     - name: domain-subnet
       cidr: 10.0.10.0/24
@@ -170,6 +177,7 @@ Standard roles used in cyber ranges:
 | `server`            | General-purpose server                                         |
 | `workstation`       | End-user workstation                                           |
 | `c2_server`         | Command & Control server (e.g., Sliver, Mythic, Cobalt Strike) |
+| `redirector`        | C2 traffic redirector                                          |
 | `attacker`          | Offensive operator workstation                                 |
 | `target`            | Standalone target system                                       |
 | `router`            | Network routing device                                         |
@@ -188,6 +196,7 @@ Standard roles used in cyber ranges:
 ### Nodes Example
 
 ```yaml
+---
 topology:
   nodes:
     - name: dc01
@@ -238,6 +247,7 @@ for the simulation of realistic degradation conditions for networks.
 ### Edges Example
 
 ```yaml
+---
 topology:
   edges:
     # Simulate WAN link between sites
@@ -275,6 +285,7 @@ function. This enables bulk operations, targeting, and policy application.
 ### Groups Example
 
 ```yaml
+---
 groups:
   ad_lab:
     description: "Active Directory lab hosts"
@@ -289,6 +300,11 @@ groups:
     description: "Command & Control servers"
     type: infrastructure
     members: [sliver, mythic]
+
+  redirectors:
+    description: "C2 traffic redirectors"
+    type: infrastructure
+    members: [redir-01, redir-02]
 
   windows:
     description: "All Windows hosts"
@@ -419,6 +435,7 @@ Defines network security rules for nodes.
 ### Resources Example
 
 ```yaml
+---
 resources:
   profiles:
     - name: dc-standard
@@ -564,6 +581,7 @@ management (e.g., Ansible).
 ### Provisioning Example
 
 ```yaml
+---
 provisioning:
   method: cloud_shell_ansible # Uses SSM (AWS), IAP (GCP), or Bastion (Azure)
 
@@ -644,6 +662,7 @@ topology. The agent platform defines where agents run.
 ### Agent Platform Example
 
 ```yaml
+---
 agent_platform:
   type: kubernetes
   name: agent-cluster
@@ -808,6 +827,7 @@ Configuration for telemetry collection agents deployed to nodes.
 ### Telemetry Example
 
 ```yaml
+---
 telemetry:
   # Distributed tracing
   tracing:
@@ -963,6 +983,7 @@ Each VPN provider may have additional settings:
 **Tailscale:**
 
 ```yaml
+---
 config:
   tailnet: example.com
   acl_tags: [tag:range, tag:operators]
@@ -972,6 +993,7 @@ config:
 **WireGuard:**
 
 ```yaml
+---
 config:
   interface: wg0
   listen_port: 51820
@@ -985,6 +1007,7 @@ config:
 **Nebula:**
 
 ```yaml
+---
 config:
   ca_cert: secret:nebula-ca
   node_cert: secret:nebula-node-cert
@@ -1063,6 +1086,7 @@ Environment-to-environment network connections for agent traffic and telemetry.
 ### Connectivity Example
 
 ```yaml
+---
 connectivity:
   # VPN/Overlay network for private access
   overlay:
@@ -1126,6 +1150,7 @@ connectivity:
 ## Complete Example
 
 ```yaml
+---
 apiVersion: aces.io/v1alpha1
 kind: CyberRange
 metadata:
@@ -1149,6 +1174,11 @@ groups:
     type: infrastructure
     members: [sliver, mythic]
 
+  redirectors:
+    description: "C2 traffic redirectors"
+    type: infrastructure
+    members: [redir-01]
+
   attackers:
     description: "Offensive operator workstations"
     type: role-based
@@ -1163,7 +1193,7 @@ topology:
     - name: range-vpc
       cidr: 10.0.0.0/16
       routing: nat
-      private_endpoints: [remote_management, storage, file_storage]
+      private_service_access: [remote_management, storage, file_storage]
 
     - name: corp-subnet
       cidr: 10.0.10.0/24
@@ -1229,6 +1259,25 @@ topology:
           network: range-vpc
           ip_address: 10.0.4.100/24
 
+    # C2 Redirectors
+    - name: redir-01
+      type: host
+      role: redirector
+      computer_name: redir-01
+      friendly_name: "HTTPS Redirector"
+      os: linux
+      os_version: "22.04"
+      os_distribution: ubuntu
+      tier: low
+      groups: [redirectors]
+      services: [nginx, https]
+      owner: red-team
+      notes: "Fronts sliver C2 traffic, terminates TLS"
+      interfaces:
+        - name: eth0
+          network: dmz-subnet
+          ip_address: 10.0.20.50/24
+
     # Attacker Workstations
     - name: kali-01
       type: host
@@ -1264,6 +1313,12 @@ resources:
         type: gp3
         encrypted: true
 
+    - name: redirector
+      instance_type: t3.micro
+      volume:
+        size: 20Gi
+        type: gp3
+
   image_filters:
     - name: windows-2019-base
       owners: [amazon]
@@ -1294,6 +1349,20 @@ resources:
         - protocol: "-1"
           cidr_blocks: [10.0.0.0/16, 172.16.0.0/16]
 
+    - name: redirector-public
+      description: "C2 redirector - accepts implant callbacks"
+      ingress:
+        - protocol: tcp
+          from_port: 443
+          to_port: 443
+          cidr_blocks: [0.0.0.0/0]
+          description: "HTTPS callbacks from implants"
+        - protocol: tcp
+          from_port: 80
+          to_port: 80
+          cidr_blocks: [0.0.0.0/0]
+          description: "HTTP callbacks (redirects to HTTPS)"
+
   bindings:
     - node: dc01
       image_filter: windows-2019-base
@@ -1312,6 +1381,12 @@ resources:
       profile: c2-server
       instance_policy: range-node-base
       security_groups: [internal-ad]
+
+    - node: redir-01
+      image_filter: ubuntu-22.04
+      profile: redirector
+      instance_policy: range-node-base
+      security_groups: [redirector-public]
 
     - node: kali-01
       image_filter: kali-latest
@@ -1456,16 +1531,16 @@ connectivity:
 
 ## Affected Repos
 
-| Repository              | Changes Required                                                     |
-| :---------------------- | :------------------------------------------------------------------- |
-| `aces-schema`           | JSON Schema and validation for CyberRange kind                       |
-| `aces-runtime`          | Support for agent platform, telemetry, connectivity                  |
-| `aces-provider-aws`     | Image filters, instance policies, security groups, private endpoints |
-| `aces-provider-gcp`     | Image filters, IAM bindings, firewall rules, Private Service Connect |
-| `aces-provider-azure`   | Image filters, RBAC, NSGs, Private Link                              |
-| `aces-provider-docker`  | Resource profiles, networking                                        |
-| `aces-provider-proxmox` | Resource profiles, VM templates                                      |
-| `aces-provisioner`      | Ansible playbook execution via cloud shell/SSH                       |
+| Repository              | Changes Required                                                          |
+| :---------------------- | :------------------------------------------------------------------------ |
+| `aces-schema`           | JSON Schema and validation for CyberRange kind                            |
+| `aces-runtime`          | Support for agent platform, telemetry, connectivity                       |
+| `aces-provider-aws`     | Image filters, instance policies, security groups, private service access |
+| `aces-provider-gcp`     | Image filters, IAM bindings, firewall rules, Private Service Connect      |
+| `aces-provider-azure`   | Image filters, RBAC, NSGs, Private Link                                   |
+| `aces-provider-docker`  | Resource profiles, networking                                             |
+| `aces-provider-proxmox` | Resource profiles, VM templates                                           |
+| `aces-provisioner`      | Ansible playbook execution via cloud shell/SSH                            |
 
 ## Consequences
 
