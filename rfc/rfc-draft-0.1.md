@@ -2,11 +2,20 @@
 
 ## Summary
 
-This draft RFC proposes a declarative YAML specification for defining reproducible cyber experiment ranges. This enables seamless ingestion by range orchestration tools and execution via compatible runtimes within the Agentic Cyber Environment System (ACES).
+This draft RFC proposes a declarative YAML specification for defining
+reproducible cyber experiment ranges. This enables seamless ingestion by range
+orchestration tools and execution via compatible runtimes within the Agentic
+Cyber Environment System (ACES).
 
 ## Motivation
 
-For ACES to serve as an open reference architecture for autonomous AI agent research, it requires a standardized, framework-agnostic language to express scenarios. Other experiment environments have had success in specifying distributed network systems using a graph-based approach (vertices and edges) mapped to a network simulation like proxmox. ACES will ingest a declarative schema capable of supporting multiple instantiation backends (e.g., Docker, cloud providers, hypervisors) and complex agentic experimentation loops.
+For ACES to serve as an open reference architecture for autonomous AI agent
+research, it requires a standardized, framework-agnostic language to express
+scenarios. Other experiment environments have had success in specifying
+distributed network systems using a graph-based approach (vertices and edges)
+mapped to a network simulation like proxmox. ACES will ingest a declarative
+schema capable of supporting multiple instantiation backends (e.g., Docker,
+cloud providers, hypervisors) and complex agentic experimentation loops.
 
 ### Design Principles
 
@@ -35,7 +44,8 @@ The proposed schema is divided into seven core sections:
 
 ### Root Schema
 
-The root of the YAML document defines the API version, the kind of resource, and the infrastructure pillars.
+The root of the YAML document defines the API version, the kind of resource,
+and the infrastructure pillars.
 
 | Field            | Type   | Required | Description                                                 | Example                              |
 | :--------------- | :----- | :------- | :---------------------------------------------------------- | :----------------------------------- |
@@ -76,11 +86,14 @@ connectivity: { ... }
 
 ## Topology
 
-The topology block defines the "what" of the environment. It outlines the structure of the network without concerning itself with how the virtualization or emulation will occur.
+The topology block defines the "what" of the environment. It outlines the
+structure of the network without concerning itself with how the virtualization
+or emulation will occur.
 
 ### Networks
 
-Networks represent broadcast domains, local area networks, subnets, and switching fabrics.
+Networks represent broadcast domains, local area networks, subnets, and
+switching fabrics.
 
 | Property            | Type    | Required | Description                                      | Example                        |
 | :------------------ | :------ | :------- | :----------------------------------------------- | :----------------------------- |
@@ -93,7 +106,8 @@ Networks represent broadcast domains, local area networks, subnets, and switchin
 
 #### Private Endpoints
 
-For cloud deployments, private endpoints enable connectivity to managed services without traversing the public internet.
+For cloud deployments, private endpoints enable connectivity to managed
+services without traversing the public internet.
 
 | Endpoint            | AWS                             | GCP            | Azure         | Description           |
 | :------------------ | :------------------------------ | :------------- | :------------ | :-------------------- |
@@ -103,7 +117,7 @@ For cloud deployments, private endpoints enable connectivity to managed services
 | `secrets`           | Secrets Manager                 | Secret Manager | Key Vault     | Secrets access        |
 | `logs`              | CloudWatch Logs                 | Cloud Logging  | Log Analytics | Log shipping          |
 
-### Example
+### Networks Example
 
 ```yaml
 topology:
@@ -122,7 +136,8 @@ topology:
 
 ### Nodes
 
-Nodes represent endpoints or edge devices, including routers, switches, and firewalls within the environment.
+Nodes represent endpoints or edge devices, including routers, switches, and
+firewalls within the environment.
 
 | Property          | Type   | Required | Description                              | Example                                                |
 | :---------------- | :----- | :------- | :--------------------------------------- | :----------------------------------------------------- |
@@ -170,7 +185,7 @@ Standard roles used in cyber ranges:
 | `ip_address` | String  | No       | Static IP address, if specified.      | `192.168.1.1/24`    |
 | `hw_address` | String  | No       | Hardware (e.g. MAC) address.          | `DE:AD:BE:EF:00:01` |
 
-#### Example
+### Nodes Example
 
 ```yaml
 topology:
@@ -210,7 +225,8 @@ topology:
 
 ### Edges
 
-Edges define physical and link layer constraints between interfaces, allowing for the simulation of realistic degradation conditions for networks.
+Edges define physical and link layer constraints between interfaces, allowing
+for the simulation of realistic degradation conditions for networks.
 
 | Property      | Type   | Required | Description                    | Example                     |
 | :------------ | :----- | :------- | :----------------------------- | :-------------------------- |
@@ -219,7 +235,7 @@ Edges define physical and link layer constraints between interfaces, allowing fo
 | `packet_loss` | Float  | No       | Percentage of dropped packets. | `0.05`                      |
 | `bandwidth`   | String | No       | Maximum bandwidth.             | `1Gbps`                     |
 
-#### Example
+### Edges Example
 
 ```yaml
 topology:
@@ -245,7 +261,8 @@ topology:
 
 ## Groups
 
-Groups provide logical organization of nodes by role, deployment method, or function. This enables bulk operations, targeting, and policy application.
+Groups provide logical organization of nodes by role, deployment method, or
+function. This enables bulk operations, targeting, and policy application.
 
 | Property      | Type   | Required | Description                                            | Example                                                  |
 | :------------ | :----- | :------- | :----------------------------------------------------- | :------------------------------------------------------- |
@@ -255,7 +272,7 @@ Groups provide logical organization of nodes by role, deployment method, or func
 | `provisioner` | String | No       | Tool that created these nodes (for deployment groups). | `terraform`                                              |
 | `members`     | Array  | No       | Explicit list of node names (optional).                | `[dc01, dc02]`                                           |
 
-### Example
+### Groups Example
 
 ```yaml
 groups:
@@ -287,7 +304,9 @@ groups:
 
 ## Resources
 
-The resources block maps the logical topology to physical or virtual realities. This separation allows the same topology to be executed on a local hypervisor, a container engine, or a public cloud.
+The resources block maps the logical topology to physical or virtual realities.
+This separation allows the same topology to be executed on a local hypervisor,
+a container engine, or a public cloud.
 
 ### Resource Profiles
 
@@ -313,7 +332,8 @@ Defines standardized compute configurations to ensure reproducible performance.
 
 ### Image Filters
 
-Defines how to select machine images for cloud deployments. This example uses AWS AMI filters, but the pattern applies to other clouds.
+Defines how to select machine images for cloud deployments. This example uses
+AWS AMI filters, but the pattern applies to other clouds.
 
 | Property      | Type    | Required | Description                        | Example                  |
 | :------------ | :------ | :------- | :--------------------------------- | :----------------------- |
@@ -396,7 +416,7 @@ Defines network security rules for nodes.
 | `security_groups` | Array   | No       | Source/destination security groups. | `[agent-cluster]`                |
 | `description`     | String  | No       | Rule description.                   | `SMB from VPC`                   |
 
-### Example
+### Resources Example
 
 ```yaml
 resources:
@@ -501,7 +521,9 @@ resources:
 
 ## Provisioning
 
-The provisioning block defines post-deployment configuration steps. This separates the infrastructure creation (e.g., Terraform) from configuration management (e.g., Ansible).
+The provisioning block defines post-deployment configuration steps. This
+separates the infrastructure creation (e.g., Terraform) from configuration
+management (e.g., Ansible).
 
 | Property    | Type   | Required | Description                   | Example                                            |
 | :---------- | :----- | :------- | :---------------------------- | :------------------------------------------------- |
@@ -539,7 +561,7 @@ The provisioning block defines post-deployment configuration steps. This separat
 | `type`      | String | Yes      | Template type.         | `powershell`, `bash`, `cloud_init` |
 | `variables` | Object | No       | Template variables.    | `{join_domain: true}`              |
 
-### Example
+### Provisioning Example
 
 ```yaml
 provisioning:
@@ -586,7 +608,8 @@ provisioning:
 
 ## Agent Platform
 
-Production deployments require agent execution to be separated from the target topology. The agent platform defines where agents run.
+Production deployments require agent execution to be separated from the target
+topology. The agent platform defines where agents run.
 
 | Property       | Type   | Required | Description                       | Example                              |
 | :------------- | :----- | :------- | :-------------------------------- | :----------------------------------- |
@@ -618,7 +641,7 @@ Production deployments require agent execution to be separated from the target t
 | `type`   | String | Yes      | Storage backend. | `redis`, `postgres`, `s3`            |
 | `url`    | String | No       | Connection URL.  | `redis://redis.aces-agents.svc:6379` |
 
-### Example
+### Agent Platform Example
 
 ```yaml
 agent_platform:
@@ -642,7 +665,10 @@ agent_platform:
 
 ## Telemetry
 
-The telemetry block defines observability infrastructure for the range. This includes collection, processing, storage, and visualization of logs, traces, and metrics. Telemetry is critical for attack simulation analysis and blue team feedback loops.
+The telemetry block defines observability infrastructure for the range. This
+includes collection, processing, storage, and visualization of logs, traces,
+and metrics. Telemetry is critical for attack simulation analysis and blue
+team feedback loops.
 
 | Property            | Type   | Required | Description                                    | Example                              |
 | :------------------ | :----- | :------- | :--------------------------------------------- | :----------------------------------- |
@@ -710,7 +736,8 @@ Collection points define where telemetry is gathered from nodes in the range.
 
 ### Sinks
 
-Sinks define where telemetry is shipped. Multiple sinks enable fan-out patterns for local analysis and external platform integration.
+Sinks define where telemetry is shipped. Multiple sinks enable fan-out
+patterns for local analysis and external platform integration.
 
 | Property      | Type   | Required | Description                | Example                            |
 | :------------ | :----- | :------- | :------------------------- | :--------------------------------- |
@@ -723,7 +750,8 @@ Sinks define where telemetry is shipped. Multiple sinks enable fan-out patterns 
 
 ### Span Dimensions
 
-Span dimensions define custom attributes extracted from traces for metrics generation and correlation. These are critical for attack analysis.
+Span dimensions define custom attributes extracted from traces for metrics
+generation and correlation. These are critical for attack analysis.
 
 | Dimension                | Description                      | Example Values                                        |
 | :----------------------- | :------------------------------- | :---------------------------------------------------- |
@@ -777,7 +805,7 @@ Configuration for telemetry collection agents deployed to nodes.
 | `version` | String | No       | Agent version.     | `1.6.0`                                           |
 | `env`     | String | No       | Environment label. | `dev`, `staging`, `prod`                          |
 
-### Example
+### Telemetry Example
 
 ```yaml
 telemetry:
@@ -895,13 +923,17 @@ telemetry:
 
 ## Connectivity
 
-The connectivity block defines how different environments and operators access the range. This is critical for:
+The connectivity block defines how different environments and operators access
+the range. This is critical for:
 
-1. **Agent-to-target connectivity**: Agents running in a separate platform accessing target nodes
+1. **Agent-to-target connectivity**: Agents running in a separate platform
+   accessing target nodes
 2. **Operator access**: Human operators accessing private instances (no public IPs)
 3. **Telemetry egress**: Shipping observability data to external systems
 
-Many ranges deploy nodes in private subnets with no public IP addresses or SSH access. Connectivity is provided via overlay networks (Tailscale, WireGuard) or cloud-native solutions (AWS Systems Manager).
+Many ranges deploy nodes in private subnets with no public IP addresses or SSH
+access. Connectivity is provided via overlay networks (Tailscale, WireGuard)
+or cloud-native solutions (AWS Systems Manager).
 
 | Property          | Type   | Required | Description                                          | Example                            |
 | :---------------- | :----- | :------- | :--------------------------------------------------- | :--------------------------------- |
@@ -911,7 +943,8 @@ Many ranges deploy nodes in private subnets with no public IP addresses or SSH a
 
 ### VPN / Overlay Network
 
-Overlay networks provide secure connectivity to private instances without exposing them to the public internet.
+Overlay networks provide secure connectivity to private instances without
+exposing them to the public internet.
 
 | Property           | Type   | Required | Description                              | Example                                                   |
 | :----------------- | :----- | :------- | :--------------------------------------- | :-------------------------------------------------------- |
@@ -960,7 +993,8 @@ config:
 
 ### Operator Access
 
-Defines how human operators access range nodes for management, red team operations, or debugging.
+Defines how human operators access range nodes for management, red team
+operations, or debugging.
 
 | Property      | Type   | Required | Description                                     | Example                      |
 | :------------ | :----- | :------- | :---------------------------------------------- | :--------------------------- |
@@ -1026,7 +1060,7 @@ Environment-to-environment network connections for agent traffic and telemetry.
 | `allowed_ports` | Array  | No       | Ports permitted.           | `[22, 445, 389, 636, 88, 135]` |
 | `denied_ports`  | Array  | No       | Ports explicitly blocked.  | `[3389]`                       |
 
-### Example
+### Connectivity Example
 
 ```yaml
 connectivity:
@@ -1411,10 +1445,14 @@ connectivity:
 
 ## Alternatives Considered
 
-1. **JSON Schema Only**: Rejected because YAML is more human-readable and supports comments.
-2. **Pulumi/CDK-style Imperative**: Rejected because declarative specs are easier to version, diff, and validate.
-3. **Combined Range + Experiment**: Rejected to enable range reuse across multiple experiments (see RFC-0002).
-4. **Embedded Provisioning in Bindings**: Rejected to keep resource mapping separate from configuration management.
+1. **JSON Schema Only**: Rejected because YAML is more human-readable and
+   supports comments.
+2. **Pulumi/CDK-style Imperative**: Rejected because declarative specs are
+   easier to version, diff, and validate.
+3. **Combined Range + Experiment**: Rejected to enable range reuse across
+   multiple experiments (see RFC-0002).
+4. **Embedded Provisioning in Bindings**: Rejected to keep resource mapping
+   separate from configuration management.
 
 ## Affected Repos
 
@@ -1434,16 +1472,19 @@ connectivity:
 ### What Becomes Easier
 
 - **Range reuse**: Same infrastructure supports multiple experiments
-- **Independent versioning**: Infrastructure changes tracked separately from experiment changes
+- **Independent versioning**: Infrastructure changes tracked separately from
+  experiment changes
 - **Provider flexibility**: Topology decoupled from instantiation backend
-- **Team collaboration**: Infrastructure team can define ranges, research team defines experiments
+- **Team collaboration**: Infrastructure team can define ranges, research team
+  defines experiments
 - **Provisioning clarity**: Clear separation between infra creation and configuration
 
 ### What Becomes Harder
 
 - **Simple scenarios**: Requires two files (range + experiment) instead of one
 - **Learning curve**: Must understand range/experiment separation
-- **Cloud specificity**: Some resource fields (e.g., image filters, instance policies) are cloud-specific (mitigated by provider abstraction)
+- **Cloud specificity**: Some resource fields (e.g., image filters, instance
+  policies) are cloud-specific (mitigated by provider abstraction)
 
 ---
 
