@@ -52,13 +52,13 @@ and the infrastructure pillars.
 | `apiVersion`     | String | Yes      | The version of the schema.                                  | `aces.io/v1alpha1`                   |
 | `kind`           | String | Yes      | The type of resource.                                       | `CyberRange`                         |
 | `metadata`       | Object | Yes      | Identifying information.                                    | `{name, description, version}`       |
-| `topology`       | Object | Yes      | The logical definition of networks, nodes, and edges.       | `{networks: [...], nodes: [...]}`    |
-| `groups`         | Object | No       | Logical grouping of nodes.                                  | `{domain_controllers: {...}}`        |
-| `resources`      | Object | No       | Hardware/virtualization requirements and resource bindings. | `{profiles: [...], bindings: [...]}` |
+| `topology`       | Object | Yes      | The logical definition of networks, nodes, and edges.       | `{networks: {...}, nodes: {...}}`    |
+| `groups`         | Object | No       | Logical grouping of nodes (map keyed by name).              | `{domain_controllers: {...}}`        |
+| `resources`      | Object | No       | Hardware/virtualization requirements and resource bindings. | `{profiles: {...}, bindings: {...}}` |
 | `provisioning`   | Object | No       | Post-deployment configuration.                              | `{method: cloud_shell_ansible}`      |
 | `agent_platform` | Object | No       | Platform where agents execute.                              | `{type: kubernetes, name: ...}`      |
 | `telemetry`      | Object | No       | Observability and event collection configuration.           | `{tracing: {...}, logging: {...}}`   |
-| `connectivity`   | Array  | No       | Network connectivity between environments.                  | `[{name: agents-to-targets, ...}]`   |
+| `connectivity`   | Object | No       | Network connectivity between environments.                  | `{overlay: {...}, connections: {}}` |
 
 ### Example
 
@@ -96,9 +96,11 @@ or emulation will occur.
 Networks represent broadcast domains, local area networks, subnets, and
 switching fabrics.
 
+Networks are defined as a map keyed by name (the unique identifier).
+
 | Property                 | Type    | Required | Description                                      | Example                        |
 | :----------------------- | :------ | :------- | :----------------------------------------------- | :----------------------------- |
-| `name`                   | String  | Yes      | Unique identifier for the network.               | `corporate-lan`                |
+| `display_name`           | String  | No       | Human-readable label (not used for references).  | `Corporate LAN`                |
 | `cidr`                   | String  | Yes      | IPv4/IPv6 subnet.                                | `10.0.0.0/16`                  |
 | `routing`                | String  | No       | The routing mode.                                | `isolated`, `nat`, `bridged`   |
 | `vlan_id`                | Integer | No       | Optional VLAN identifier.                        | `100`                          |
@@ -119,13 +121,13 @@ See [Appendix A](#appendix-a-provider-mappings) for provider-specific service ma
 ---
 topology:
   networks:
-    - name: range-vpc
+    range-vpc:
       cidr: 10.0.0.0/16
       secondary_cidr: 100.64.0.0/16 # For Kubernetes pod networking
       routing: nat
       private_service_access: [remote_management, storage, file_storage]
 
-    - name: domain-subnet
+    domain-subnet:
       cidr: 10.0.10.0/24
       routing: isolated
       vlan_id: 10
@@ -134,15 +136,15 @@ topology:
 ### Nodes
 
 Nodes represent endpoints or edge devices, including routers, switches, and
-firewalls within the environment.
+firewalls within the environment. Nodes are defined as a map keyed by name
+(the unique identifier).
 
 | Property          | Type   | Required | Description                              | Example                                                |
 | :---------------- | :----- | :------- | :--------------------------------------- | :----------------------------------------------------- |
-| `name`            | String | Yes      | Unique identifier for the node.          | `dc01`                                                 |
 | `type`            | String | Yes      | Device type.                             | `host`, `router`, `switch`, `firewall`                 |
 | `role`            | String | No       | Functional role within the environment.  | `domain_controller`, `c2_server`, `attacker`, `target` |
 | `computer_name`   | String | No       | NetBIOS/hostname as seen in the OS.      | `DC01`                                                 |
-| `friendly_name`   | String | No       | Human-readable display name.             | `Primary Domain Controller`                            |
+| `display_name`    | String | No       | Human-readable label (not used for references). | `Primary Domain Controller`                     |
 | `os`              | String | No       | Operating system.                        | `windows`, `linux`                                     |
 | `os_version`      | String | No       | OS version.                              | `2019`, `2022`, `22.04`                                |
 | `os_distribution` | String | No       | Linux distribution (if applicable).      | `ubuntu`, `kali`, `debian`                             |
@@ -150,7 +152,7 @@ firewalls within the environment.
 | `tier`            | String | No       | Criticality tier for targeting/defense.  | `critical`, `high`, `medium`, `low`                    |
 | `groups`          | Array  | No       | References to group names.               | `[ad_lab, domain_controllers, windows]`                |
 | `services`        | Array  | No       | Services running on this node.           | `[ldap, kerberos, dns, smb]`                           |
-| `interfaces`      | Array  | Yes      | List of NetworkInterface objects.        | `[{name: eth0, network: corp-lan}]`                    |
+| `network_interfaces` | Array | Yes    | List of NetworkInterface objects.        | `[{name: eth0, network: corp-lan}]`                    |
 | `provisioner`     | String | No       | Tool used to provision this node.        | `terraform`, `ansible`, `docker`                       |
 | `provisioner_id`  | String | No       | ID within the provisioner system.        | `dc01`                                                 |
 | `owner`           | String | No       | Responsible operator or team.            | `infra-team`, `red-team`                               |
@@ -179,11 +181,11 @@ also supported.
 ---
 topology:
   nodes:
-    - name: dc01
+    dc01:
       type: host
       role: domain_controller
       computer_name: DC01
-      friendly_name: "Primary Domain Controller"
+      display_name: "Primary Domain Controller"
       os: windows
       os_version: "2019"
       domain: corp.local
@@ -193,12 +195,12 @@ topology:
       provisioner: terraform
       provisioner_id: dc01
       owner: infra-team
-      interfaces:
+      network_interfaces:
         - name: eth0
           network: corp-subnet
           ip_address: 10.0.10.10/24
 
-    - name: kali-01
+    kali-01:
       type: host
       role: attacker
       computer_name: kali-01
@@ -206,7 +208,7 @@ topology:
       os_distribution: kali
       groups: [attackers]
       features: [vnc_access, pre_installed_tools]
-      interfaces:
+      network_interfaces:
         - name: eth0
           network: range-vpc
           dhcp: true
@@ -253,11 +255,12 @@ topology:
 
 Groups provide logical organization of nodes by role, deployment method, or
 function. This enables bulk operations, targeting, and policy application.
+Groups are defined as a map keyed by name (the unique identifier).
 
-| Property      | Type   | Required | Description                                            | Example                                                  |
-| :------------ | :----- | :------- | :----------------------------------------------------- | :------------------------------------------------------- |
-| `name`        | String | Yes      | Unique identifier for the group.                       | `domain_controllers`                                     |
-| `description` | String | No       | Human-readable description.                            | `Active Directory domain controllers`                    |
+| Property       | Type   | Required | Description                                            | Example                                                  |
+| :------------- | :----- | :------- | :----------------------------------------------------- | :------------------------------------------------------- |
+| `display_name` | String | No       | Human-readable label (not used for references).        | `Domain Controllers`                                     |
+| `description`  | String | No       | Human-readable description.                            | `Active Directory domain controllers`                    |
 | `type`        | String | No       | Grouping strategy.                                     | `deployment`, `role-based`, `os-based`, `infrastructure` |
 | `provisioner` | String | No       | Tool that created these nodes (for deployment groups). | `terraform`                                              |
 | `members`     | Array  | No       | Explicit list of node names (optional).                | `[dc01, dc02]`                                           |
@@ -307,10 +310,10 @@ a container engine, or a public cloud.
 ### Resource Profiles
 
 Defines standardized compute configurations to ensure reproducible performance.
+Profiles are defined as a map keyed by name (the unique identifier).
 
 | Property        | Type    | Required | Description                      | Example                   |
 | :-------------- | :------ | :------- | :------------------------------- | :------------------------ |
-| `name`          | String  | Yes      | Unique identifier.               | `dc-standard`             |
 | `instance_type` | String  | No       | Cloud instance type.             | `t3.medium`, `m6i.xlarge` |
 | `cpus`          | Integer | No       | Number of vCPUs (for non-cloud). | `4`                       |
 | `memory`        | String  | No       | RAM allocation.                  | `8Gi`                     |
@@ -329,11 +332,11 @@ Defines standardized compute configurations to ensure reproducible performance.
 ### Image Filters
 
 Defines how to select machine images for cloud deployments. This example uses
-AWS AMI filters, but the pattern applies to other clouds.
+AWS AMI filters, but the pattern applies to other clouds. Image filters are
+defined as a map keyed by name (the unique identifier).
 
 | Property      | Type    | Required | Description                        | Example                  |
 | :------------ | :------ | :------- | :--------------------------------- | :----------------------- |
-| `name`        | String  | Yes      | Unique identifier for this filter. | `windows-2019-base`      |
 | `owners`      | Array   | No       | Image owner account IDs.           | `[amazon, 099720109477]` |
 | `filters`     | Object  | Yes      | Image filter criteria.             | See below                |
 | `most_recent` | Boolean | No       | Select most recent matching image. | `true`                   |
@@ -349,11 +352,11 @@ AWS AMI filters, but the pattern applies to other clouds.
 
 ### Instance Policies
 
-Defines IAM/service account policies to attach to instances.
+Defines IAM/service account policies to attach to instances. Policies are
+defined as a map keyed by name (the unique identifier).
 
 | Property           | Type   | Required | Description                                            | Example                             |
 | :----------------- | :----- | :------- | :----------------------------------------------------- | :---------------------------------- |
-| `name`             | String | Yes      | Policy identifier.                                     | `range-node-base`                   |
 | `capabilities`     | Array  | No       | Abstract capabilities (resolved to provider policies). | `[remote_management, metrics_logs]` |
 | `managed_policies` | Array  | No       | Provider-specific managed policy ARNs/names.           | `[AmazonSSMManagedInstanceCore]`    |
 | `inline_policies`  | Array  | No       | Custom inline policy documents.                        | `[{name: custom, document: {...}}]` |
@@ -367,11 +370,11 @@ See [Appendix A](#appendix-a-provider-mappings) for provider-specific policy map
 
 ### Bindings
 
-Maps specific nodes to images, compute profiles, and policies.
+Maps specific nodes to images, compute profiles, and policies. Bindings are
+defined as a map keyed by node name.
 
 | Property          | Type   | Required | Description                               | Example                            |
 | :---------------- | :----- | :------- | :---------------------------------------- | :--------------------------------- |
-| `node`            | String | Yes      | Reference to a node name in the topology. | `dc01`                             |
 | `image`           | String | No       | Direct image URI or ID.                   | `ami-0abcdef1234567890`            |
 | `image_filter`    | String | No       | Reference to an image filter name.        | `windows-2019-base`                |
 | `profile`         | String | No       | Reference to a resource profile.          | `dc-standard`                      |
@@ -381,11 +384,11 @@ Maps specific nodes to images, compute profiles, and policies.
 
 ### Security Groups
 
-Defines network security rules for nodes.
+Defines network security rules for nodes. Security groups are defined as a map
+keyed by name (the unique identifier).
 
 | Property      | Type   | Required | Description                 | Example               |
 | :------------ | :----- | :------- | :-------------------------- | :-------------------- |
-| `name`        | String | Yes      | Security group identifier.  | `internal-ad`         |
 | `description` | String | No       | Human-readable description. | `Internal AD traffic` |
 | `ingress`     | Array  | No       | Inbound rules.              | See Rule Object       |
 | `egress`      | Array  | No       | Outbound rules.             | See Rule Object       |
@@ -407,28 +410,28 @@ Defines network security rules for nodes.
 ---
 resources:
   profiles:
-    - name: dc-standard
+    dc-standard:
       instance_type: t3.medium
       volume:
         size: 100Gi
         type: gp3
         encrypted: true
 
-    - name: c2-server
+    c2-server:
       instance_type: t3.large
       volume:
         size: 100Gi
         type: gp3
         encrypted: true
 
-    - name: attacker-workstation
+    attacker-workstation:
       instance_type: t3.medium
       volume:
         size: 50Gi
         type: gp3
 
   image_filters:
-    - name: windows-2019-base
+    windows-2019-base:
       owners: [amazon]
       most_recent: true
       filters:
@@ -436,32 +439,32 @@ resources:
         virtualization-type: hvm
         root-device-type: ebs
 
-    - name: ubuntu-22.04
+    ubuntu-22.04:
       owners: [099720109477] # Canonical
       most_recent: true
       filters:
         name: "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
         architecture: x86_64
 
-    - name: kali-latest
+    kali-latest:
       owners: [679593333241] # Kali
       most_recent: true
       filters:
         name: "kali-linux-*"
 
   instance_policies:
-    - name: range-node-base
+    range-node-base:
       capabilities: [remote_management, metrics_logs]
       # Provider-specific policies resolved at deploy time:
       # AWS: AmazonSSMManagedInstanceCore, CloudWatchAgentServerPolicy
       # GCP: roles/iap.tunnelResourceAccessor, roles/logging.logWriter
       # Azure: Virtual Machine User Login, Monitoring Metrics Publisher
 
-    - name: c2-server-policy
+    c2-server-policy:
       capabilities: [remote_management, storage_full]
 
   security_groups:
-    - name: internal-ad
+    internal-ad:
       description: "Internal AD traffic"
       ingress:
         - protocol: "-1"
@@ -475,7 +478,7 @@ resources:
           cidr_blocks: [0.0.0.0/0]
           description: "All outbound"
 
-    - name: c2-server
+    c2-server:
       description: "C2 server access"
       ingress:
         - protocol: tcp
@@ -488,14 +491,14 @@ resources:
           cidr_blocks: [10.0.0.0/16]
 
   bindings:
-    - node: dc01
+    dc01:
       image_filter: windows-2019-base
       profile: dc-standard
       instance_policy: range-node-base
       security_groups: [internal-ad]
       user_data: templates/windows-dc.ps1.tpl
 
-    - node: sliver
+    sliver:
       image_filter: ubuntu-22.04
       profile: c2-server
       instance_policy: c2-server-policy
@@ -514,8 +517,8 @@ management (e.g., Ansible).
 | Property    | Type   | Required | Description                   | Example                                            |
 | :---------- | :----- | :------- | :---------------------------- | :------------------------------------------------- |
 | `method`    | String | Yes      | Provisioning method.          | `cloud_shell_ansible`, `ssh_ansible`, `cloud_init` |
-| `playbooks` | Array  | No       | Ansible playbook definitions. | See Playbook Object                                |
-| `templates` | Array  | No       | User data templates.          | See Template Object                                |
+| `playbooks` | Object | No       | Ansible playbook definitions (map keyed by name). | `{dc-setup: {...}}`                                |
+| `templates` | Object | No       | User data templates (map keyed by name).          | `{windows-bootstrap: {...}}`                       |
 
 ### Provisioning Methods
 
@@ -528,9 +531,10 @@ management (e.g., Ansible).
 
 ### Playbook Object
 
+Playbooks are defined as a map keyed by name (the unique identifier).
+
 | Property     | Type   | Required | Description                   | Example                        |
 | :----------- | :----- | :------- | :---------------------------- | :----------------------------- |
-| `name`       | String | Yes      | Playbook identifier.          | `dc-setup`                     |
 | `path`       | String | Yes      | Path to playbook file.        | `ansible/windows/dc_setup.yml` |
 | `host_type`  | String | No       | Target OS type.               | `windows`, `linux`             |
 | `groups`     | Array  | No       | Node groups to target.        | `[domain_controllers]`         |
@@ -540,9 +544,10 @@ management (e.g., Ansible).
 
 ### Template Object
 
+Templates are defined as a map keyed by name (the unique identifier).
+
 | Property    | Type   | Required | Description            | Example                            |
 | :---------- | :----- | :------- | :--------------------- | :--------------------------------- |
-| `name`      | String | Yes      | Template identifier.   | `windows-bootstrap`                |
 | `path`      | String | Yes      | Path to template file. | `templates/windows-dc.ps1.tpl`     |
 | `type`      | String | Yes      | Template type.         | `powershell`, `bash`, `cloud_init` |
 | `variables` | Object | No       | Template variables.    | `{join_domain: true}`              |
@@ -555,28 +560,28 @@ provisioning:
   method: cloud_shell_ansible # Uses SSM (AWS), IAP (GCP), or Bastion (Azure)
 
   templates:
-    - name: windows-bootstrap
+    windows-bootstrap:
       path: templates/windows-dc.ps1.tpl
       type: powershell
       variables:
         install_cloud_agent: true # SSM agent, GCP guest agent, Azure agent
         enable_winrm: true
 
-    - name: linux-c2
+    linux-c2:
       path: templates/linux-c2.sh.tpl
       type: bash
       variables:
         install_docker: true
 
   playbooks:
-    - name: domain-controllers
+    domain-controllers:
       path: ansible/windows/dc_setup.yml
       host_type: windows
       groups: [domain_controllers]
       extra_vars:
         telemetry_endpoint: "https://loki.example.com/loki/api/v1/push"
 
-    - name: sliver-setup
+    sliver-setup:
       path: ansible/linux/sliver.yml
       host_type: linux
       nodes: [sliver]
@@ -584,7 +589,7 @@ provisioning:
         sliver_version: "1.5.42"
         enable_multiplayer: true
 
-    - name: kali-operator
+    kali-operator:
       path: ansible/linux/kali_setup.yml
       host_type: linux
       groups: [attackers]
@@ -664,10 +669,10 @@ team feedback loops.
 | `metrics`           | Object | No       | Metrics collection configuration.              | `{backend: prometheus}`              |
 | `logging`           | Object | No       | Log aggregation configuration.                 | `{backend: loki, retention: 14d}`    |
 | `collection_points` | Array  | No       | Event collection sources.                      | `[{type: windows_security, ...}]`    |
-| `sinks`             | Array  | No       | Telemetry destinations (supports fan-out).     | `[{name: local-tempo, type: otlp}]`  |
+| `sinks`             | Object | No       | Telemetry destinations (map keyed by name).    | `{local-tempo: {type: otlp}}`        |
 | `span_dimensions`   | Array  | No       | Custom span attributes for attack correlation. | `[mitre.tactic, attack_phase]`       |
 | `storage`           | Object | No       | Storage tiers and retention.                   | `{hot: {...}, warm: {...}}`          |
-| `dashboards`        | Array  | No       | Dashboard configurations.                      | `[{name: attack-traces, type: ...}]` |
+| `dashboards`        | Object | No       | Dashboard configurations (map keyed by name).  | `{attack-traces: {type: grafana}}`   |
 | `agent`             | Object | No       | Telemetry agent configuration.                 | `{type: alloy, version: 1.6.0}`      |
 
 ### Tracing Configuration
@@ -719,11 +724,11 @@ Supported types: `windows_security`, `syslog`, `kubernetes_logs`, `network_pcap`
 ### Sinks
 
 Sinks define where telemetry is shipped. Multiple sinks enable fan-out
-patterns for local analysis and external platform integration.
+patterns for local analysis and external platform integration. Sinks are
+defined as a map keyed by name (the unique identifier).
 
 | Property      | Type   | Required | Description                | Example                            |
 | :------------ | :----- | :------- | :------------------------- | :--------------------------------- |
-| `name`        | String | Yes      | Sink identifier.           | `local-tempo`                      |
 | `type`        | String | Yes      | Sink type.                 | `otlp`, `loki`, `prometheus`, `s3` |
 | `endpoint`    | String | Yes      | Destination endpoint.      | `http://tempo:4317`                |
 | `format`      | String | No       | Output format.             | `ocsf`, `ecs`, `raw`               |
@@ -753,11 +758,11 @@ data temperatures. Each tier specifies:
 
 ### Dashboards
 
-Dashboard configurations for visualization.
+Dashboard configurations for visualization. Dashboards are defined as a map
+keyed by name (the unique identifier).
 
 | Property      | Type   | Required | Description                  | Example                         |
 | :------------ | :----- | :------- | :--------------------------- | :------------------------------ |
-| `name`        | String | Yes      | Dashboard identifier.        | `attack-chain-traces`           |
 | `type`        | String | Yes      | Dashboard type.              | `grafana`, `kibana`             |
 | `source`      | String | No       | Dashboard definition source. | `dashboards/attack-traces.json` |
 | `datasources` | Array  | No       | Required datasources.        | `[prometheus, loki, tempo]`     |
@@ -827,15 +832,15 @@ telemetry:
 
   # Fan-out to multiple destinations
   sinks:
-    - name: local-tempo
+    local-tempo:
       type: otlp
       endpoint: "http://tempo.observability:4317"
 
-    - name: local-loki
+    local-loki:
       type: loki
       endpoint: "http://loki-gateway.observability:80"
 
-    - name: platform-traces
+    platform-traces:
       type: otlp
       endpoint: "https://platform.example.com/api/otel/traces"
       credentials: secret:platform-api-key
@@ -843,7 +848,7 @@ telemetry:
         size: 1000
         timeout: 5s
 
-    - name: archive
+    archive:
       type: s3
       endpoint: "s3://range-telemetry/ad-range/"
       format: ocsf
@@ -876,12 +881,12 @@ telemetry:
 
   # Dashboards
   dashboards:
-    - name: attack-chain-traces
+    attack-chain-traces:
       type: grafana
       source: dashboards/attack-traces.json
       datasources: [prometheus, loki, tempo]
 
-    - name: blue-team-analysis
+    blue-team-analysis:
       type: grafana
       source: dashboards/blue-team.json
       datasources: [prometheus, loki]
@@ -907,7 +912,7 @@ or cloud-native solutions (AWS Systems Manager).
 | :---------------- | :----- | :------- | :--------------------------------------------------- | :--------------------------------- |
 | `overlay`         | Object | No       | Overlay network configuration (Tailscale/WireGuard). | `{type: tailscale, auth_key: ...}` |
 | `operator_access` | Object | No       | How operators access private instances.              | `{methods: [vpn, cloud_shell]}`    |
-| `connections`     | Array  | No       | Environment-to-environment connections.              | `[{name: agents-to-targets, ...}]` |
+| `connections`     | Object | No       | Environment-to-environment connections (map keyed by name). | `{agents-to-targets: {...}}` |
 
 ### VPN / Overlay Network
 
@@ -976,10 +981,10 @@ ports. Type maps to provider services: `ssm` (AWS), `iap` (GCP), `bastion` (Azur
 ### Connections
 
 Environment-to-environment network connections for agent traffic and telemetry.
+Connections are defined as a map keyed by name (the unique identifier).
 
 | Property      | Type   | Required | Description                      | Example                                           |
 | :------------ | :----- | :------- | :------------------------------- | :------------------------------------------------ |
-| `name`        | String | Yes      | Connection identifier.           | `agents-to-targets`                               |
 | `type`        | String | Yes      | Connectivity mechanism.          | `tailscale`, `wireguard`, `vpc_peering`, `direct` |
 | `source`      | Object | Yes      | Source environment details.      | `{environment: agent-cluster, cidr: ...}`         |
 | `destination` | Object | Yes      | Destination environment details. | `{environment: ad-range, cidr: ...}`              |
@@ -1037,7 +1042,7 @@ connectivity:
 
   # Environment-to-environment connections
   connections:
-    - name: agents-to-targets
+    agents-to-targets:
       type: tailscale
       source:
         environment: agent-cluster
@@ -1050,7 +1055,7 @@ connectivity:
         direction: egress_only
         allowed_ports: [22, 445, 389, 636, 88, 135, 139, 5985, 5986]
 
-    - name: telemetry-ingestion
+    telemetry-ingestion:
       type: vpc_peering
       source:
         environment: ad-range
