@@ -181,3 +181,7 @@ List every repo that would need changes to implement this RFC.
 ## Consequences
 
 What becomes easier or harder as a result of this change? What are the migration requirements?
+
+## Companion Document
+
+Defensive control taxonomy, reproducibility fields, and reporting guidance have been moved to [rfc-defense-appendix-draft-0.1.md](./rfc-defense-appendix-draft-0.1.md).
