@@ -856,6 +856,7 @@ objectives:
 ### Embedded Domain Semantics
 
 Rejected because:
+
 - Forces domain concepts on unrelated experiments
 - Harder to extend to new domains
 - Labels + custom conditions provide equivalent expressiveness
@@ -863,6 +864,7 @@ Rejected because:
 ### Separate Specs Per Domain
 
 Rejected because:
+
 - Duplicates core agent/objective/runtime concepts
 - Harder to build shared tooling
 - This spec can be extended, not forked
