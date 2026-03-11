@@ -40,6 +40,25 @@ The proposed schema is divided into seven core sections:
 
 ---
 
+## Type Definitions
+
+The following shared types are referenced throughout this specification.
+
+| Type | Kind | Values |
+| :--- | :--- | :----- |
+| `OS` | extensible-enum | `linux`, `windows`, `macos`, `freebsd` |
+| `Tier` | extensible-enum | `critical`, `high`, `medium`, `low` |
+| `NodeType` | extensible-enum | `host`, `router`, `switch`, `firewall` |
+| `Routing` | extensible-enum | `isolated`, `nat`, `bridged` |
+| `Role` | growing | `domain_controller`, `server`, `workstation`, `attacker`, `target`, `c2_server`, `redirector` |
+| `Provisioner` | growing | `terraform`, `ansible`, `docker`, `proxmox`, `cloud_init` |
+
+**Kind definitions:**
+- **`extensible-enum`**: A closed list of standard values. Custom values are allowed using the `x-` prefix (e.g., `x-myos`).
+- **`growing`**: An open list where new standard values are expected to be added over time.
+
+---
+
 ## Schema Specification
 
 ### Root Schema
@@ -102,7 +121,7 @@ Networks are defined as a map keyed by name (the unique identifier).
 | :----------------------- | :------ | :------- | :----------------------------------------------- | :----------------------------- |
 | `display_name`           | String  | No       | Human-readable label (not used for references).  | `Corporate LAN`                |
 | `cidr`                   | String  | Yes      | IPv4/IPv6 subnet.                                | `10.0.0.0/16`                  |
-| `routing`                | String  | No       | The routing mode.                                | `isolated`, `nat`, `bridged`   |
+| `routing`                | Routing | No       | The routing mode.                                | see [Type Definitions](#type-definitions) |
 | `vlan_id`                | Integer | No       | Optional VLAN identifier.                        | `100`                          |
 | `secondary_cidr`         | String  | No       | Secondary CIDR block (e.g., for pod networking). | `100.64.0.0/16`                |
 | `private_service_access` | Array   | No       | Managed service connectivity (private access).   | `[remote_management, storage]` |
@@ -141,29 +160,23 @@ firewalls within the environment. Nodes are defined as a map keyed by name
 
 | Property          | Type   | Required | Description                              | Example                                                |
 | :---------------- | :----- | :------- | :--------------------------------------- | :----------------------------------------------------- |
-| `type`            | String | Yes      | Device type.                             | `host`, `router`, `switch`, `firewall`                 |
-| `role`            | String | No       | Functional role within the environment.  | `domain_controller`, `c2_server`, `attacker`, `target` |
-| `computer_name`   | String | No       | NetBIOS/hostname as seen in the OS.      | `DC01`                                                 |
-| `display_name`    | String | No       | Human-readable label (not used for references). | `Primary Domain Controller`                     |
-| `os`              | String | No       | Operating system.                        | `windows`, `linux`                                     |
-| `os_version`      | String | No       | OS version.                              | `2019`, `2022`, `22.04`                                |
-| `os_distribution` | String | No       | Linux distribution (if applicable).      | `ubuntu`, `kali`, `debian`                             |
-| `domain`          | String | No       | Domain membership (for AD environments). | `corp.local`                                           |
-| `tier`            | String | No       | Criticality tier for targeting/defense.  | `critical`, `high`, `medium`, `low`                    |
-| `groups`          | Array  | No       | References to group names.               | `[ad_lab, domain_controllers, windows]`                |
-| `services`        | Array  | No       | Services running on this node.           | `[ldap, kerberos, dns, smb]`                           |
-| `network_interfaces` | Array | Yes    | List of NetworkInterface objects.        | `[{name: eth0, network: corp-lan}]`                    |
-| `provisioner`     | String | No       | Tool used to provision this node.        | `terraform`, `ansible`, `docker`                       |
+| `type`            | NodeType    | Yes      | Device type.                             | see [Type Definitions](#type-definitions) |
+| `role`            | Role        | No       | Functional role within the environment.  | see [Type Definitions](#type-definitions) |
+| `computer_name`   | String      | No       | NetBIOS/hostname as seen in the OS.      | `DC01`                                    |
+| `display_name`    | String      | No       | Human-readable label (not used for references). | `Primary Domain Controller`        |
+| `os`              | OS          | No       | Operating system.                        | see [Type Definitions](#type-definitions) |
+| `os_version`      | String      | No       | OS version.                              | `2019`, `2022`, `22.04`                   |
+| `os_distribution` | String      | No       | Linux distribution (if applicable).      | `ubuntu`, `kali`, `debian`                |
+| `domain`          | String      | No       | Domain membership (for AD environments). | `corp.local`                              |
+| `tier`            | Tier        | No       | Criticality tier for targeting/defense.  | see [Type Definitions](#type-definitions) |
+| `groups`          | Array       | No       | References to group names.               | `[ad_lab, domain_controllers, windows]`   |
+| `services`        | Array       | No       | Services running on this node.           | `[ldap, kerberos, dns, smb]`              |
+| `network_interfaces` | Array    | Yes      | List of NetworkInterface objects.        | `[{name: eth0, network: corp-lan}]`       |
+| `provisioner`     | Provisioner | No       | Tool used to provision this node.        | see [Type Definitions](#type-definitions) |
 | `provisioner_id`  | String | No       | ID within the provisioner system.        | `dc01`                                                 |
 | `owner`           | String | No       | Responsible operator or team.            | `infra-team`, `red-team`                               |
 | `features`        | Array  | No       | Capabilities or flags for this node.     | `[vnc_access, pre_installed_tools]`                    |
 | `notes`           | String | No       | Freeform metadata or documentation.      | `Primary DC for corp.local`                            |
-
-#### Node Roles
-
-Standard roles: `domain_controller`, `server`, `workstation`, `c2_server`,
-`redirector`, `attacker`, `target`, `router`, `firewall`. Custom roles are
-also supported.
 
 #### NetworkInterface Object
 
@@ -262,7 +275,7 @@ Groups are defined as a map keyed by name (the unique identifier).
 | `display_name` | String | No       | Human-readable label (not used for references).        | `Domain Controllers`                                     |
 | `description`  | String | No       | Human-readable description.                            | `Active Directory domain controllers`                    |
 | `type`        | String | No       | Grouping strategy.                                     | `deployment`, `role-based`, `os-based`, `infrastructure` |
-| `provisioner` | String | No       | Tool that created these nodes (for deployment groups). | `terraform`                                              |
+| `provisioner` | Provisioner | No   | Tool that created these nodes (for deployment groups). | see [Type Definitions](#type-definitions) |
 | `members`     | Array  | No       | Explicit list of node names (optional).                | `[dc01, dc02]`                                           |
 
 ### Groups Example
