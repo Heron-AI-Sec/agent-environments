@@ -54,6 +54,7 @@ The following shared types are referenced throughout this specification.
 | `Provisioner` | growing | `terraform`, `ansible`, `docker`, `proxmox`, `cloud_init` |
 
 **Kind definitions:**
+
 - **`extensible-enum`**: A closed list of standard values. Custom values are allowed using the `x-` prefix (e.g., `x-myos`).
 - **`growing`**: An open list where new standard values are expected to be added over time.
 
