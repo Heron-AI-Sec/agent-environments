@@ -1615,6 +1615,7 @@ telemetry:
 ### AD Telemetry
 
 For AD environments, use the security extension from RFC-0003 which defines:
+
 - Active Directory attributes (`ad.domain`, `ad.object.dn`, etc.)
 - Credential attributes (`credential.type`, `credential.domain`, etc.)
 
