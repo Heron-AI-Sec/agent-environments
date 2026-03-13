@@ -67,7 +67,7 @@ This object maps an agent to the relevant platform context.
 
 Telemetry specifications are already embedded in RFC-0001.
 
-### Experiment specification.
+### Experiment specification
 
 Intermediate states are optionally captured as an extension of RFC-0002, which already specifies initial and expected end states.
 
