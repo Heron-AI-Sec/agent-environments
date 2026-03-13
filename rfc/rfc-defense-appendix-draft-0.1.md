@@ -78,7 +78,40 @@ The intent of these fields is:
 
 Some control types are commonly `detect_only`, while others are commonly `detect_and_block`. Scenario authors SHOULD declare the intended behavior for the specific product instance used in the scenario rather than assuming it from the control family.
 
-### A.4. Evaluation Outcome Model
+### A.4. Agent Decision Records
+
+An `AgentDecision` is the structured record emitted by an agent each time it acts. It captures the full decision loop — what the agent observed, how it reasoned, what it executed, and what came back. In the context of defensive evaluation, each `AgentDecision` represents a concrete action that defensive controls are evaluated against. The `id` field of an `AgentDecision` is what `actionRef` in section A.5 references.
+
+| `Property` | `Type` | `Required` | `Description` | `Example` |
+| :---- | :---- | :---- | :---- | :---- |
+| `id` | `String` | `Yes` | `Unique identifier for this decision record.` | `decision-0042` |
+| `agent_id` | `String` | `Yes` | `Which agent made this decision.` | `explorer` |
+| `timestamp` | `String` | `Yes` | `When the decision was made (ISO 8601).` | `2026-03-13T14:32:00Z` |
+| `objective_ref` | `String` | `Yes` | `Reference to the RFC-0002 objective the agent was pursuing.` | `environment-mapped` |
+| `environment_state` | `Object` | `No` | `Snapshot of relevant environment state at decision time.` | `{nodes: {server-01: {compromised: false}}}` |
+| `input` | `Object` | `Yes` | `What the agent received or observed before deciding.` | `{source: telemetry, data: {...}}` |
+| `cot` | `Array` | `Yes` | `Chain-of-Thought reasoning steps. **How to gather this?**` | `["identified open port", "selected nmap"]` |
+| `tool_calls` | `Array` | `Yes` | `Tools the agent executed. Each entry is a ToolCall object (see below).` | see ToolCall |
+| `output` | `Object` | `Yes` | `What came back — results, responses, or errors.` | `{status: success, data: {...}}` |
+| `outcome` | `String` | `No` | `Did it work? success, failure, aborted` | `success` |
+
+#### ToolCall Object
+
+Multiple tool calls may occur in parallel within a single decision. Each is recorded as a separate `ToolCall` entry.
+
+| `Property` | `Type` | `Required` | `Description` | `Example` |
+| :---- | :---- | :---- | :---- | :---- |
+| `id` | `String` | `Yes` | `Unique identifier for this specific tool execution.` | `call_9f8a7b6c` |
+| `tool_name` | `String` | `Yes` | `The name of the tool, function, or command invoked.` | `execute_shell`, `read_file` |
+| `arguments` | `Object` | `Yes` | `Key-value pairs of the parameters passed to the tool.` | `{command: "nmap -p 22,80 10.0.5.50"}` |
+| `timestamp` | `String` | `Yes` | `When the tool execution started (ISO 8601).` | `2026-03-13T14:32:01Z` |
+| `duration_ms` | `Integer` | `No` | `How long the tool took to execute.` | `4520` |
+| `output` | `Object` | `Yes` | `The raw output returned by the tool.` | `{stdout: "PORT STATE...", exit_code: 0}` |
+| `status` | `String` | `Yes` | `The execution state of the tool itself.` | `success`, `error`, `timeout` |
+
+The `tool_calls` field is the primary signal for defensive evaluation — it records exactly what the agent attempted, which is what defensive controls are positioned to detect or block.
+
+### A.5. Evaluation Outcome Model
 
 To compare defensive results across experiments, implementations SHOULD evaluate defensive controls against named scenario actions and produce a per-control result record.
 
@@ -86,7 +119,7 @@ Each evaluation record SHOULD include the following fields:
 
 | `Property` | `Type` | `Description` | `Example` |
 | :---- | :---- | :---- | :---- |
-| `actionRef` | `String` | `Reference to the runtime action, attack step, or validation step under test.` | `sqli-login-attempt` |
+| `actionRef` | `String` | `Reference to an AgentDecision id (see A.4).` | `decision-0042` |
 | `controlRef` | `String` | `Reference to the defensive control instance.` | `edge-waf-01` |
 | `expected_effect` | `String` | `Expected control behavior for the action.` | `{detect, block, respond, none}` |
 | `detection_observed` | `Boolean` | `Whether observable telemetry or an alert was generated.` | `true` |
@@ -103,11 +136,11 @@ The normalized `final_outcome` values are intended to mean:
 * `partially_blocked`: the control reduced or interrupted the action, but some objective was still achieved.
 * `not_applicable`: the control was not intended to cover that action.
 
-### A.5. Defensive Control Families
+### A.6. Defensive Control Families
 
 The following families are RECOMMENDED as a baseline taxonomy for ACES scenarios. The list is not exhaustive, but it covers the most common product classes likely to appear in an enterprise cyber range.
 
-#### A.5.1. Network Security Controls
+#### A.6.1. Network Security Controls
 
 Network controls operate at trust boundaries, network choke points, routing domains, and monitored segments.
 
@@ -122,7 +155,7 @@ Network controls operate at trust boundaries, network choke points, routing doma
 
 Network controls SHOULD be modeled by reference to the nodes and networks where they are deployed and by the actions that traverse or target those paths.
 
-#### A.5.2. Endpoint Security Controls
+#### A.6.2. Endpoint Security Controls
 
 Endpoint controls operate on workstations, servers, containers, or other host nodes.
 
@@ -137,7 +170,7 @@ Endpoint controls operate on workstations, servers, containers, or other host no
 
 Endpoint controls SHOULD reference the node names where agents or protections are deployed and the runtime actions that execute on or against those nodes.
 
-#### A.5.3. Application Security Controls
+#### A.6.3. Application Security Controls
 
 Application controls protect application protocols, service logic, and exposed APIs.
 
@@ -152,7 +185,7 @@ Application controls protect application protocols, service logic, and exposed A
 
 Application controls SHOULD be associated with the service-hosting nodes and with the runtime actions that simulate user, attacker, or automated application traffic.
 
-#### A.5.4. Identity and Access Security Controls
+#### A.6.4. Identity and Access Security Controls
 
 Identity controls govern authentication, authorization, privilege, and trust relationships.
 
@@ -167,7 +200,7 @@ Identity controls govern authentication, authorization, privilege, and trust rel
 
 Identity controls SHOULD be modeled against authentication and authorization actions that occur in runtime phases and against the nodes or services that enforce trust decisions.
 
-#### A.5.5. Monitoring and Response Controls
+#### A.6.5. Monitoring and Response Controls
 
 Monitoring and response controls collect, correlate, enrich, and sometimes automate follow-on defensive actions.
 
@@ -182,7 +215,7 @@ Monitoring and response controls collect, correlate, enrich, and sometimes autom
 
 Monitoring and response platforms are commonly `detect_only` or `respond_after_detection`. Scenario authors SHOULD not assume that these controls directly prevent an action unless an explicit downstream response path is modeled.
 
-### A.6. Reporting and Reproducibility Guidance
+### A.7. Reporting and Reproducibility Guidance
 
 Implementations SHOULD emit a structured report that makes it easy to compare what was bypassed, what was detected, and what was blocked across control products and scenario runs.
 
@@ -204,7 +237,7 @@ Implementations MAY also calculate summary measures such as:
 * false positive count
 * service availability impact during enforcement
 
-### A.7. Illustrative YAML Fragment
+### A.8. Illustrative YAML Fragment
 
 The following example is non-normative and demonstrates one way to describe a defensive control and its evaluation results within a scenario artifact or report.
 
