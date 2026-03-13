@@ -398,148 +398,21 @@ schema:
 The security extension adds attributes and events for security-focused
 experiments (red team, blue team, purple team).
 
-### Security Attributes
+**See RFC-0004: Security Domain Schema** for the complete security extension
+specification, including:
 
-#### MITRE ATT&CK Attributes
+- MITRE ATT&CK attributes (`mitre.tactic`, `mitre.technique.id`, etc.)
+- Team attributes (`security.team`, `security.operation`, `security.campaign`)
+- Attack attributes (`attack.phase`, `attack.vector`, `attack.target.type`)
+- Defense attributes (`detection.rule`, `detection.severity`, `response.action`)
+- Credential attributes (`credential.type`, `credential.username`, etc.)
+- Active Directory attributes (`ad.domain`, `ad.forest`, `ad.object.*`)
+- Security event classes (`security.attack.*`, `security.defense.*`)
+- Security correlation patterns (attack chains, attack→detection linking)
 
-| Attribute                  | Type   | Description                      | Example              |
-|:---------------------------|:-------|:---------------------------------|:---------------------|
-| `mitre.tactic`             | String | ATT&CK tactic                    | `credential-access`  |
-| `mitre.tactic.id`          | String | Tactic ID                        | `TA0006`             |
-| `mitre.technique.id`       | String | Technique ID                     | `T1003.006`          |
-| `mitre.technique.name`     | String | Technique name                   | `DCSync`             |
-| `mitre.subtechnique.id`    | String | Sub-technique ID                 | `T1003.006`          |
-
-#### Team Attributes
-
-| Attribute                  | Type   | Description                      | Example              |
-|:---------------------------|:-------|:---------------------------------|:---------------------|
-| `security.team`            | String | Team assignment                  | `red`, `blue`        |
-| `security.operation`       | String | Operation name                   | `credential-harvest` |
-| `security.campaign`        | String | Campaign identifier              | `campaign-001`       |
-
-#### Attack Attributes
-
-| Attribute                  | Type   | Description                      | Example              |
-|:---------------------------|:-------|:---------------------------------|:---------------------|
-| `attack.phase`             | String | Kill chain phase                 | `lateral-movement`   |
-| `attack.vector`            | String | Attack vector                    | `phishing`, `exploit`|
-| `attack.target.type`       | String | Target type                      | `credential`, `host` |
-
-#### Defense Attributes
-
-| Attribute                  | Type   | Description                      | Example              |
-|:---------------------------|:-------|:---------------------------------|:---------------------|
-| `detection.rule`           | String | Detection rule that fired        | `dcsync_detected`    |
-| `detection.severity`       | String | Alert severity                   | `critical`, `high`   |
-| `detection.confidence`     | Float  | Detection confidence             | `0.95`               |
-| `response.action`          | String | Response action taken            | `isolate`, `alert`   |
-
-#### Credential Attributes
-
-| Attribute                  | Type   | Description                      | Example              |
-|:---------------------------|:-------|:---------------------------------|:---------------------|
-| `credential.type`          | String | Credential type                  | `ntlm`, `kerberos`   |
-| `credential.username`      | String | Username                         | `admin`              |
-| `credential.domain`        | String | Domain                           | `corp.local`         |
-| `credential.source`        | String | How credential was obtained      | `lsass`, `dcsync`    |
-
-#### Active Directory Attributes
-
-| Attribute                  | Type   | Description                      | Example              |
-|:---------------------------|:-------|:---------------------------------|:---------------------|
-| `ad.domain`                | String | AD domain                        | `corp.local`         |
-| `ad.forest`                | String | AD forest                        | `corp.local`         |
-| `ad.object.type`           | String | AD object type                   | `user`, `computer`   |
-| `ad.object.dn`             | String | Distinguished name               | `CN=Admin,DC=corp`   |
-| `ad.object.sid`            | String | Security identifier              | `S-1-5-21-...`       |
-
-### Security Event Classes
-
-#### Attack Events (`security.attack.*`)
-
-| Class                          | Description                          |
-|:-------------------------------|:-------------------------------------|
-| `security.attack.reconnaissance`| Reconnaissance activity              |
-| `security.attack.initial_access`| Initial access attempt               |
-| `security.attack.execution`    | Code/command execution               |
-| `security.attack.persistence`  | Persistence mechanism                |
-| `security.attack.privilege_escalation` | Privilege escalation attempt  |
-| `security.attack.credential_access` | Credential access attempt       |
-| `security.attack.lateral_movement` | Lateral movement attempt         |
-| `security.attack.exfiltration` | Data exfiltration attempt            |
-
-#### Defense Events (`security.defense.*`)
-
-| Class                          | Description                          |
-|:-------------------------------|:-------------------------------------|
-| `security.defense.alert`       | Alert triggered                      |
-| `security.defense.detection`   | Detection rule matched               |
-| `security.defense.response`    | Response action taken                |
-| `security.defense.containment` | Containment action                   |
-| `security.defense.investigation`| Investigation activity              |
-
-### Security Correlation Patterns
-
-#### Attack Chain
-
-```text
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│ security.attack │────▶│ security.attack │────▶│ security.attack │
-│ .reconnaissance │     │ .credential_    │     │ .lateral_       │
-│                 │     │    access       │     │    movement     │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-  mitre.tactic:           mitre.tactic:           mitre.tactic:
-    discovery               credential-access       lateral-movement
-```
-
-All spans share `security.campaign` and `trace_id`.
-
-#### Attack → Detection
-
-```text
-┌─────────────────┐     correlation_id      ┌─────────────────┐
-│ security.attack │ ────────────────────────▶│ security.       │
-│ .credential_    │                          │   defense.alert │
-│    access       │                          │                 │
-└─────────────────┘                          └─────────────────┘
-  agent.name: red-agent                        detection.rule: dcsync
-  mitre.technique.id: T1003.006                detection.severity: critical
-```
-
-### Security Extension Example
-
-```yaml
-# Red team action span
-span:
-  name: action.tool.impacket
-  attributes:
-    # Core attributes
-    agent.name: credential-agent
-    action.name: secretsdump
-    action.type: tool
-    target.node: dc01
-
-    # Security extension attributes
-    security.team: red
-    mitre.tactic: credential-access
-    mitre.technique.id: T1003.006
-    mitre.technique.name: DCSync
-    attack.phase: credential-harvesting
-    ad.domain: corp.local
-
-# Blue team detection
-event:
-  class: security.defense.alert
-  attributes:
-    detection.rule: dcsync_detected
-    detection.severity: critical
-    detection.confidence: 0.98
-    correlation_id: corr-123  # Links to attack
-
-    # MITRE mapping
-    mitre.technique.id: T1003.006
-```
+RFC-0004 §16 defines these telemetry attributes as part of the unified security
+domain schema, ensuring consistency between attack graph types, blue team
+taxonomy, and observability semantics.
 
 ---
 
@@ -799,5 +672,6 @@ span:
 |:----------------------------------------|:---------------------------------------|
 | RFC-0001: Environment Infrastructure    | Defines telemetry backends and sinks   |
 | RFC-0002: Experiment Specification      | References schema for observations     |
+| RFC-0004: Security Domain Schema        | Defines security extension attributes, event classes, and correlation patterns (§16) |
 | OpenTelemetry Semantic Conventions      | Attribute naming alignment             |
 | OCSF Schema                             | Security event structure alignment     |
