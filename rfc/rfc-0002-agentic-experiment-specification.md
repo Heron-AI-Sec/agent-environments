@@ -32,6 +32,31 @@ A standardized experiment specification enables:
 
 ---
 
+## Type Definitions
+
+Fields across this schema are categorized by stability tier, which determines how strictly they are validated and how extensions are handled.
+
+| Tier | Description | Validation |
+| :--- | :---------- | :--------- |
+| `extensible-enum` | Closed list of known values. New values allowed via `x-` prefix convention (e.g. `x-my-custom-value`). | Pattern-enforced |
+| `growing` | Open list. Known values are documented but new values are expected and accepted without the `x-` prefix. | Documented only |
+
+### Shared Types
+
+| Type | Kind | Values |
+| :--- | :--- | :----- |
+| `AgentType` | growing | `llm`, `rl`, `scripted`, `hybrid`, `human` |
+| `ScoringMode` | extensible-enum | `cumulative`, `time_weighted`, `competitive`, `threshold` |
+| `RestartPolicy` | extensible-enum | `never`, `on_failure` |
+| `CommunicationPattern` | extensible-enum | `streaming`, `batch`, `direct`, `blackboard` |
+| `ConditionType` | growing | `state`, `event`, `metric`, `artifact`, `agent_status`, `elapsed`, `custom` |
+| `InjectType` | growing | `event`, `state`, `message`, `artifact`, `delay` |
+| `CapabilityType` | growing | `shell`, `tool`, `api`, `protocol` |
+| `SourceType` | growing | `telemetry`, `local`, `api` |
+| `ModelProvider` | growing | `anthropic`, `openai`, `deepseek`, `xai`, `google`, `mistral` |
+
+---
+
 ## Schema Overview
 
 | Section       | Purpose                                              |
@@ -143,7 +168,7 @@ Agents are defined as a map keyed by name (the unique identifier).
 | Property      | Type   | Required | Description                                    | Example                        |
 |:--------------|:-------|:---------|:-----------------------------------------------|:-------------------------------|
 | `display_name`| String | No       | Human-readable label.                          | `Research Agent`               |
-| `type`        | String | Yes      | Agent paradigm.                                | `llm`, `rl`, `scripted`, `hybrid`, `human` |
+| `type`        | AgentType | Yes      | Agent paradigm.                                | see [Type Definitions](#type-definitions) |
 | `goal`        | String | Yes      | Natural language objective.                    | `Analyze and report findings`  |
 | `model`       | Object | No       | LLM configuration (for llm/hybrid).            | See Model                      |
 | `observation` | Object | No       | What the agent can perceive.                   | See Observation                |
@@ -171,7 +196,7 @@ LLM configuration for `llm` and `hybrid` agents.
 
 | Property      | Type    | Required | Description              | Example                    |
 |:--------------|:--------|:---------|:-------------------------|:---------------------------|
-| `provider`    | String  | No       | Model provider.          | `anthropic`, `openai`      |
+| `provider`    | ModelProvider | No  | Model provider.          | see [Type Definitions](#type-definitions) |
 | `name`        | String  | No       | Model identifier.        | `claude-sonnet-4-20250514` |
 | `temperature` | Float   | No       | Sampling temperature.    | `0.7`                      |
 | `max_tokens`  | Integer | No       | Maximum response tokens. | `4096`                     |
@@ -198,7 +223,7 @@ agent feedback. Event formats and attributes follow RFC-0003 schema conventions.
 
 | Property  | Type   | Required | Description                              | Example                    |
 |:----------|:-------|:---------|:-----------------------------------------|:---------------------------|
-| `type`    | String | Yes      | Source type.                             | `telemetry`, `local`, `api`|
+| `type`    | SourceType | Yes  | Source type.                             | see [Type Definitions](#type-definitions) |
 | `ref`     | String | No       | RFC-0001 reference (for telemetry).      | `telemetry.sinks.loki`     |
 | `filter`  | Object | No       | Filter criteria.                         | `{severity: critical}`     |
 | `channels`| Array  | No       | Local channels.                          | `[stdout, stderr]`         |
@@ -225,7 +250,7 @@ What the agent can do.
 
 | Property | Type   | Required | Description                | Example                 |
 |:---------|:-------|:---------|:---------------------------|:------------------------|
-| `type`   | String | Yes      | Capability type.           | `shell`, `tool`, `api`  |
+| `type`   | CapabilityType | Yes | Capability type.           | see [Type Definitions](#type-definitions) |
 | `allowed`| Array  | No       | Allowed values.            | `[bash]`, `[nmap, curl]`|
 | `denied` | Array  | No       | Denied values.             | `[rm -rf /]`            |
 | `scopes` | Array  | No       | Permission scopes.         | `[read, write]`         |
@@ -258,7 +283,7 @@ Inter-agent communication. Uses RFC-0001 `agent_platform.orchestrator` and
 
 | Property      | Type   | Required | Description                 | Example                   |
 |:--------------|:-------|:---------|:----------------------------|:--------------------------|
-| `pattern`     | String | No       | Communication pattern.      | `streaming`, `batch`, `direct`, `blackboard` |
+| `pattern`     | CommunicationPattern | No | Communication pattern. | see [Type Definitions](#type-definitions) |
 | `channels`    | Array  | No       | Named pub/sub channels.     | `[findings, requests]`    |
 | `rpc_service` | String | No       | RPC service name.           | `coordinator`             |
 
@@ -271,7 +296,7 @@ Agent spawn and termination conditions.
 | `max_iterations` | Integer | No       | Maximum action iterations.         | `1000`                  |
 | `timeout`        | String  | No       | Maximum runtime.                   | `1h`                    |
 | `terminate_on`   | String  | No       | Objective that terminates agent.   | `goal-reached`          |
-| `restart_policy` | String  | No       | Behavior on failure.               | `never`, `on_failure`   |
+| `restart_policy` | RestartPolicy | No | Behavior on failure.               | see [Type Definitions](#type-definitions) |
 
 ### Agents Example
 
@@ -357,7 +382,7 @@ Conditions define when an objective is achieved.
 
 | Property | Type   | Required | Description                         | Example                  |
 |:---------|:-------|:---------|:------------------------------------|:-------------------------|
-| `type`   | String | Yes      | Condition type.                     | See Condition Types      |
+| `type`   | ConditionType | Yes | Condition type.                     | see [Type Definitions](#type-definitions) |
 | `negate` | Boolean| No       | Invert the condition.               | `true`                   |
 | ...      | ...    | ...      | Type-specific fields.               | See below                |
 
@@ -471,7 +496,7 @@ Injects are defined as a map keyed by name (the unique identifier).
 |:--------------|:-------|:---------|:----------------------------------|:---------------------------|
 | `display_name`| String | No       | Human-readable label.             | `External Trigger`         |
 | `description` | String | No       | Detailed description.             | `Simulates...`             |
-| `type`        | String | Yes      | Inject type.                      | See Inject Types           |
+| `type`        | InjectType | Yes  | Inject type.                      | see [Type Definitions](#type-definitions) |
 | `target`      | String | No       | Target node or agent.             | `server-01`, `agent-1`     |
 | `payload`     | Object | Yes      | Type-specific payload.            | See below                  |
 | `timing`      | Object | No       | When to execute.                  | See Timing                 |
@@ -583,7 +608,7 @@ Phases are defined as a map keyed by name (the unique identifier).
 
 | Property      | Type    | Required | Description                  | Example      |
 |:--------------|:--------|:---------|:-----------------------------|:-------------|
-| `mode`        | String  | No       | Scoring mode.                | See Modes    |
+| `mode`        | ScoringMode | No   | Scoring mode.                | see [Type Definitions](#type-definitions) |
 | `time_limit`  | String  | No       | Scoring time window.         | `2h`         |
 | `normalize`   | Boolean | No       | Normalize scores to 0-100.   | `false`      |
 
