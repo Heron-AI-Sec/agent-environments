@@ -33,12 +33,12 @@ Consistent telemetry semantics enable:
 
 ## Schema Overview
 
-| Section        | Purpose                                                   |
-|:---------------|:----------------------------------------------------------|
-| `attributes`   | Standard attribute definitions and types                  |
-| `taxonomy`     | Event categories and classes                              |
-| `correlation`  | Patterns for linking related telemetry                    |
-| `extensions`   | Domain-specific schema additions                          |
+| Section       | Purpose                                  |
+| :------------ | :--------------------------------------- |
+| `attributes`  | Standard attribute definitions and types |
+| `taxonomy`    | Event categories and classes             |
+| `correlation` | Patterns for linking related telemetry   |
+| `extensions`  | Domain-specific schema additions         |
 
 ---
 
@@ -50,70 +50,73 @@ Core attributes appear across all telemetry types (spans, logs, metrics).
 
 Identify the source of telemetry.
 
-| Attribute              | Type   | Description                          | Example                    |
-|:-----------------------|:-------|:-------------------------------------|:---------------------------|
-| `experiment.name`      | String | Experiment identifier                | `exploration-001`          |
-| `experiment.version`   | String | Experiment version                   | `1.0.0`                    |
-| `experiment.phase`     | String | Current execution phase              | `exploration`              |
-| `environment.name`     | String | RFC-0001 environment name            | `dev-environment`          |
-| `environment.version`  | String | Environment version                  | `1.0.0`                    |
+| Attribute             | Type   | Description               | Example                           |
+| :-------------------- | :----- | :------------------------ | :-------------------------------- |
+| `experiment.name`     | String | Experiment identifier     | `exploration-001`                 |
+| `experiment.version`  | String | Experiment version        | `1.0.0`                           |
+| `experiment.agents`   | Object | Active agents             | `[explorer-agent, network-agent]` |
+| `experiment.phase`    | String | Current execution phase   | `exploration`                     |
+| `environment.name`    | String | RFC-0001 environment name | `dev-environment`                 |
+| `environment.version` | String | Environment version       | `1.0.0`                           |
 
 ### Agent Attributes
 
 Identify the agent producing or triggering telemetry.
 
-| Attribute              | Type   | Description                          | Example                    |
-|:-----------------------|:-------|:-------------------------------------|:---------------------------|
-| `agent.name`           | String | Agent identifier                     | `explorer-agent`           |
-| `agent.type`           | String | Agent paradigm                       | `llm`, `rl`, `scripted`    |
-| `agent.role`           | String | Functional role                      | `orchestrator`, `specialist`|
-| `agent.instance_id`    | String | Unique instance identifier           | `explorer-agent-7f8a9b`    |
+| Attribute           | Type   | Description                | Example                      |
+| :------------------ | :----- | :------------------------- | :--------------------------- |
+| `agent.name`        | String | Agent identifier           | `explorer-agent`             |
+| `agent.type`        | String | Agent paradigm             | `llm`, `rl`, `scripted`      |
+| `agent.role`        | String | Functional role            | `orchestrator`, `specialist` |
+| `agent.instance_id` | String | Unique instance identifier | `explorer-agent-7f8a9b`      |
 
 ### Action Attributes
 
 Describe agent actions.
 
-| Attribute              | Type    | Description                          | Example                    |
-|:-----------------------|:--------|:-------------------------------------|:---------------------------|
-| `action.name`          | String  | Action identifier                    | `shell.execute`            |
-| `action.type`          | String  | Action category                      | `shell`, `tool`, `api`     |
-| `action.input`         | String  | Action input (may be truncated)      | `nmap -sV 10.0.1.0/24`     |
-| `action.output`        | String  | Action output (may be truncated)     | `Host 10.0.1.10 is up...`  |
-| `action.status`        | String  | Outcome status                       | `success`, `failure`, `timeout` |
-| `action.duration_ms`   | Integer | Execution duration in milliseconds   | `1523`                     |
-| `action.iteration`     | Integer | Action sequence number for agent     | `42`                       |
+| Attribute            | Type    | Description                        | Example                         |
+| :------------------- | :------ | :--------------------------------- | :------------------------------ |
+| `action.name`        | String  | Action identifier                  | `shell.execute`                 |
+| `action.type`        | String  | Action category                    | `shell`, `tool`, `api`          |
+| `action.role`        | String  | Role for the action                | `root`, `user`                  |
+| `action.input`       | String  | Action input (may be truncated)    | `nmap -sV 10.0.1.0/24`          |
+| `action.output`      | String  | Action output (may be truncated)   | `Host 10.0.1.10 is up...`       |
+| `action.status`      | String  | Outcome status                     | `success`, `failure`, `timeout` |
+| `action.duration_ms` | Integer | Execution duration in milliseconds | `1523`                          |
+| `action.iteration`   | Integer | Action sequence number for agent   | `42`                            |
 
 ### Target Attributes
 
 Describe what an action targeted.
 
-| Attribute              | Type   | Description                          | Example                    |
-|:-----------------------|:-------|:-------------------------------------|:---------------------------|
-| `target.node`          | String | Target node name (RFC-0001)          | `web-01`                   |
-| `target.group`         | String | Target group name (RFC-0001)         | `servers`                  |
-| `target.network`       | String | Target network (RFC-0001)            | `internal`                 |
-| `target.address`       | String | Target IP or hostname                | `10.0.1.10`                |
-| `target.port`          | Integer| Target port                          | `443`                      |
-| `target.service`       | String | Target service                       | `https`                    |
+| Attribute        | Type    | Description                  | Example                           |
+| :--------------- | :------ | :--------------------------- | :-------------------------------- |
+| `target.node`    | String  | Target node name (RFC-0001)  | `web-01`                          |
+| `target.group`   | String  | Target group name (RFC-0001) | `servers`                         |
+| `target.network` | String  | Target network (RFC-0001)    | `internal`                        |
+| `target.address` | String  | Target IP or hostname        | `10.0.1.10`                       |
+| `target.port`    | Integer | Target port                  | `443`                             |
+| `target.service` | String  | Target service               | `https`                           |
+| `target.env`     | String  | Environment variables        | `{PATH:/usr/local/sbin:/usr/bin}` |
 
 ### Outcome Attributes
 
 Describe results and effects.
 
-| Attribute              | Type    | Description                          | Example                    |
-|:-----------------------|:--------|:-------------------------------------|:---------------------------|
-| `outcome.type`         | String  | Outcome category                     | `discovery`, `change`, `error` |
-| `outcome.description`  | String  | Human-readable outcome               | `Found 3 open ports`       |
-| `outcome.artifact`     | String  | Path to produced artifact            | `/output/scan.json`        |
-| `outcome.objective`    | String  | Objective achieved (if any)          | `environment-mapped`       |
+| Attribute             | Type   | Description                 | Example                        |
+| :-------------------- | :----- | :-------------------------- | :----------------------------- |
+| `outcome.type`        | String | Outcome category            | `discovery`, `change`, `error` |
+| `outcome.description` | String | Human-readable outcome      | `Found 3 open ports`           |
+| `outcome.artifact`    | String | Path to produced artifact   | `/output/scan.json`            |
+| `outcome.objective`   | String | Objective achieved (if any) | `environment-mapped`           |
 
 ### Timing Attributes
 
-| Attribute              | Type    | Description                          | Example                    |
-|:-----------------------|:--------|:-------------------------------------|:---------------------------|
-| `timestamp`            | String  | ISO 8601 timestamp                   | `2024-01-15T10:30:00Z`     |
-| `elapsed_ms`           | Integer | Time since experiment start          | `360000`                   |
-| `phase_elapsed_ms`     | Integer | Time since phase start               | `120000`                   |
+| Attribute          | Type    | Description                 | Example                |
+| :----------------- | :------ | :-------------------------- | :--------------------- |
+| `timestamp`        | String  | ISO 8601 timestamp          | `2024-01-15T10:30:00Z` |
+| `elapsed_ms`       | Integer | Time since experiment start | `360000`               |
+| `phase_elapsed_ms` | Integer | Time since phase start      | `120000`               |
 
 ---
 
@@ -126,14 +129,14 @@ consistent structure for different event types.
 
 Top-level groupings for events.
 
-| Category       | Description                                    |
-|:---------------|:-----------------------------------------------|
-| `agent`        | Agent lifecycle and behavior events            |
-| `action`       | Agent action execution events                  |
-| `observation`  | Agent observation events                       |
-| `environment`  | Environment state change events                |
-| `objective`    | Objective evaluation events                    |
-| `system`       | System/infrastructure events                   |
+| Category      | Description                         |
+| :------------ | :---------------------------------- |
+| `agent`       | Agent lifecycle and behavior events |
+| `action`      | Agent action execution events       |
+| `observation` | Agent observation events            |
+| `environment` | Environment state change events     |
+| `objective`   | Objective evaluation events         |
+| `system`      | System/infrastructure events        |
 
 ### Event Classes
 
@@ -141,57 +144,57 @@ Specific event types within categories.
 
 #### Agent Events (`agent.*`)
 
-| Class                  | Description                              |
-|:-----------------------|:-----------------------------------------|
-| `agent.spawned`        | Agent instance started                   |
-| `agent.terminated`     | Agent instance stopped                   |
-| `agent.iteration`      | Agent completed one reasoning cycle      |
-| `agent.error`          | Agent encountered an error               |
-| `agent.communication`  | Agent sent/received inter-agent message  |
+| Class                 | Description                             |
+| :-------------------- | :-------------------------------------- |
+| `agent.spawned`       | Agent instance started                  |
+| `agent.terminated`    | Agent instance stopped                  |
+| `agent.iteration`     | Agent completed one reasoning cycle     |
+| `agent.error`         | Agent encountered an error              |
+| `agent.communication` | Agent sent/received inter-agent message |
 
 #### Action Events (`action.*`)
 
-| Class                  | Description                              |
-|:-----------------------|:-----------------------------------------|
-| `action.started`       | Action execution began                   |
-| `action.completed`     | Action execution finished                |
-| `action.failed`        | Action execution failed                  |
-| `action.timeout`       | Action exceeded time limit               |
+| Class              | Description                |
+| :----------------- | :------------------------- |
+| `action.started`   | Action execution began     |
+| `action.completed` | Action execution finished  |
+| `action.failed`    | Action execution failed    |
+| `action.timeout`   | Action exceeded time limit |
 
 #### Observation Events (`observation.*`)
 
-| Class                  | Description                              |
-|:-----------------------|:-----------------------------------------|
-| `observation.received` | Agent received observation data          |
-| `observation.processed`| Agent processed observation              |
-| `observation.insight`  | Agent derived insight from observation   |
+| Class                   | Description                            |
+| :---------------------- | :------------------------------------- |
+| `observation.received`  | Agent received observation data        |
+| `observation.processed` | Agent processed observation            |
+| `observation.insight`   | Agent derived insight from observation |
 
 #### Environment Events (`environment.*`)
 
-| Class                  | Description                              |
-|:-----------------------|:-----------------------------------------|
-| `environment.state_change` | Environment state modified           |
-| `environment.node_event`   | Event from environment node          |
-| `environment.network_event`| Network-level event                  |
-| `environment.inject`       | Inject executed                      |
+| Class                       | Description                 |
+| :-------------------------- | :-------------------------- |
+| `environment.state_change`  | Environment state modified  |
+| `environment.node_event`    | Event from environment node |
+| `environment.network_event` | Network-level event         |
+| `environment.inject`        | Inject executed             |
 
 #### Objective Events (`objective.*`)
 
-| Class                  | Description                              |
-|:-----------------------|:-----------------------------------------|
-| `objective.achieved`   | Objective condition met                  |
-| `objective.failed`     | Objective failed (penalty condition)     |
-| `objective.progress`   | Progress toward objective                |
-| `objective.evaluated`  | Objective condition evaluated            |
+| Class                 | Description                          |
+| :-------------------- | :----------------------------------- |
+| `objective.achieved`  | Objective condition met              |
+| `objective.failed`    | Objective failed (penalty condition) |
+| `objective.progress`  | Progress toward objective            |
+| `objective.evaluated` | Objective condition evaluated        |
 
 #### System Events (`system.*`)
 
-| Class                  | Description                              |
-|:-----------------------|:-----------------------------------------|
-| `system.phase_started` | Experiment phase began                   |
-| `system.phase_ended`   | Experiment phase completed               |
-| `system.checkpoint`    | Checkpoint created                       |
-| `system.error`         | System-level error                       |
+| Class                  | Description                |
+| :--------------------- | :------------------------- |
+| `system.phase_started` | Experiment phase began     |
+| `system.phase_ended`   | Experiment phase completed |
+| `system.checkpoint`    | Checkpoint created         |
+| `system.error`         | System-level error         |
 
 ---
 
@@ -217,28 +220,28 @@ Examples:
 
 All spans SHOULD include:
 
-| Attribute              | Required | Description                          |
-|:-----------------------|:---------|:-------------------------------------|
-| `experiment.name`      | Yes      | Experiment identifier                |
-| `agent.name`           | Yes      | Agent that created the span          |
-| `experiment.phase`     | Yes      | Current phase                        |
+| Attribute          | Required | Description                 |
+| :----------------- | :------- | :-------------------------- |
+| `experiment.name`  | Yes      | Experiment identifier       |
+| `agent.name`       | Yes      | Agent that created the span |
+| `experiment.phase` | Yes      | Current phase               |
 
 Action spans SHOULD also include:
 
-| Attribute              | Required | Description                          |
-|:-----------------------|:---------|:-------------------------------------|
-| `action.name`          | Yes      | Action identifier                    |
-| `action.type`          | Yes      | Action category                      |
-| `action.status`        | Yes      | Outcome status                       |
-| `target.*`             | No       | Target attributes if applicable      |
+| Attribute       | Required | Description                     |
+| :-------------- | :------- | :------------------------------ |
+| `action.name`   | Yes      | Action identifier               |
+| `action.type`   | Yes      | Action category                 |
+| `action.status` | Yes      | Outcome status                  |
+| `target.*`      | No       | Target attributes if applicable |
 
 ### Span Relationships
 
-| Relationship   | Description                                    |
-|:---------------|:-----------------------------------------------|
-| `child_of`     | Span is a child of parent span                 |
-| `follows_from` | Span is causally related but not a child       |
-| `links`        | Span references related spans                  |
+| Relationship   | Description                              |
+| :------------- | :--------------------------------------- |
+| `child_of`     | Span is a child of parent span           |
+| `follows_from` | Span is causally related but not a child |
+| `links`        | Span references related spans            |
 
 ---
 
@@ -249,14 +252,14 @@ environment events.
 
 ### Correlation Identifiers
 
-| Identifier             | Scope                    | Description                          |
-|:-----------------------|:-------------------------|:-------------------------------------|
-| `trace_id`             | Trace                    | Links all spans in a trace           |
-| `span_id`              | Span                     | Unique span identifier               |
-| `parent_span_id`       | Span                     | Parent span for hierarchy            |
-| `experiment_id`        | Experiment               | Links all telemetry in experiment    |
-| `correlation_id`       | Causal chain             | Links causally-related events        |
-| `action_id`            | Action                   | Links action to its effects          |
+| Identifier       | Scope        | Description                       |
+| :--------------- | :----------- | :-------------------------------- |
+| `trace_id`       | Trace        | Links all spans in a trace        |
+| `span_id`        | Span         | Unique span identifier            |
+| `parent_span_id` | Span         | Parent span for hierarchy         |
+| `experiment_id`  | Experiment   | Links all telemetry in experiment |
+| `correlation_id` | Causal chain | Links causally-related events     |
+| `action_id`      | Action       | Links action to its effects       |
 
 ### Correlation Patterns
 
@@ -425,89 +428,89 @@ code-related experiments.
 
 #### Repository Attributes
 
-| Attribute                  | Type   | Description                      | Example              |
-|:---------------------------|:-------|:---------------------------------|:---------------------|
-| `repo.name`                | String | Repository name                  | `my-project`         |
-| `repo.url`                 | String | Repository URL                   | `github.com/org/repo`|
-| `repo.branch`              | String | Current branch                   | `feature/new-api`    |
-| `repo.commit`              | String | Current commit SHA               | `a1b2c3d4`           |
+| Attribute     | Type   | Description        | Example               |
+| :------------ | :----- | :----------------- | :-------------------- |
+| `repo.name`   | String | Repository name    | `my-project`          |
+| `repo.url`    | String | Repository URL     | `github.com/org/repo` |
+| `repo.branch` | String | Current branch     | `feature/new-api`     |
+| `repo.commit` | String | Current commit SHA | `a1b2c3d4`            |
 
 #### Code Attributes
 
-| Attribute                  | Type   | Description                      | Example              |
-|:---------------------------|:-------|:---------------------------------|:---------------------|
-| `code.file`                | String | File path                        | `src/main.py`        |
-| `code.function`            | String | Function name                    | `process_data`       |
-| `code.line`                | Integer| Line number                      | `42`                 |
-| `code.language`            | String | Programming language             | `python`             |
+| Attribute       | Type    | Description          | Example        |
+| :-------------- | :------ | :------------------- | :------------- |
+| `code.file`     | String  | File path            | `src/main.py`  |
+| `code.function` | String  | Function name        | `process_data` |
+| `code.line`     | Integer | Line number          | `42`           |
+| `code.language` | String  | Programming language | `python`       |
 
 #### Change Attributes
 
-| Attribute                  | Type    | Description                      | Example              |
-|:---------------------------|:--------|:---------------------------------|:---------------------|
-| `change.type`              | String  | Type of change                   | `add`, `modify`, `delete` |
-| `change.files_count`       | Integer | Number of files changed          | `5`                  |
-| `change.lines_added`       | Integer | Lines added                      | `120`                |
-| `change.lines_removed`     | Integer | Lines removed                    | `45`                 |
+| Attribute              | Type    | Description             | Example                   |
+| :--------------------- | :------ | :---------------------- | :------------------------ |
+| `change.type`          | String  | Type of change          | `add`, `modify`, `delete` |
+| `change.files_count`   | Integer | Number of files changed | `5`                       |
+| `change.lines_added`   | Integer | Lines added             | `120`                     |
+| `change.lines_removed` | Integer | Lines removed           | `45`                      |
 
 #### Quality Attributes
 
-| Attribute                  | Type    | Description                      | Example              |
-|:---------------------------|:--------|:---------------------------------|:---------------------|
-| `quality.test_coverage`    | Float   | Test coverage percentage         | `85.5`               |
-| `quality.lint_errors`      | Integer | Linting errors                   | `0`                  |
-| `quality.type_errors`      | Integer | Type checking errors             | `2`                  |
-| `quality.security_issues`  | Integer | Security scan issues             | `0`                  |
+| Attribute                 | Type    | Description              | Example |
+| :------------------------ | :------ | :----------------------- | :------ |
+| `quality.test_coverage`   | Float   | Test coverage percentage | `85.5`  |
+| `quality.lint_errors`     | Integer | Linting errors           | `0`     |
+| `quality.type_errors`     | Integer | Type checking errors     | `2`     |
+| `quality.security_issues` | Integer | Security scan issues     | `0`     |
 
 #### CI/CD Attributes
 
-| Attribute                  | Type   | Description                      | Example              |
-|:---------------------------|:-------|:---------------------------------|:---------------------|
-| `ci.pipeline`              | String | Pipeline name                    | `build-and-test`     |
-| `ci.job`                   | String | Job name                         | `unit-tests`         |
-| `ci.status`                | String | Pipeline/job status              | `success`, `failed`  |
-| `ci.duration_ms`           | Integer| Duration in milliseconds         | `45000`              |
+| Attribute        | Type    | Description              | Example             |
+| :--------------- | :------ | :----------------------- | :------------------ |
+| `ci.pipeline`    | String  | Pipeline name            | `build-and-test`    |
+| `ci.job`         | String  | Job name                 | `unit-tests`        |
+| `ci.status`      | String  | Pipeline/job status      | `success`, `failed` |
+| `ci.duration_ms` | Integer | Duration in milliseconds | `45000`             |
 
 ### Software Engineering Event Classes
 
 #### Development Events (`swe.dev.*`)
 
-| Class                          | Description                          |
-|:-------------------------------|:-------------------------------------|
-| `swe.dev.file_created`         | New file created                     |
-| `swe.dev.file_modified`        | File modified                        |
-| `swe.dev.file_deleted`         | File deleted                         |
-| `swe.dev.function_added`       | New function added                   |
-| `swe.dev.refactor`             | Code refactored                      |
+| Class                    | Description        |
+| :----------------------- | :----------------- |
+| `swe.dev.file_created`   | New file created   |
+| `swe.dev.file_modified`  | File modified      |
+| `swe.dev.file_deleted`   | File deleted       |
+| `swe.dev.function_added` | New function added |
+| `swe.dev.refactor`       | Code refactored    |
 
 #### Testing Events (`swe.test.*`)
 
-| Class                          | Description                          |
-|:-------------------------------|:-------------------------------------|
-| `swe.test.suite_started`       | Test suite started                   |
-| `swe.test.suite_completed`     | Test suite completed                 |
-| `swe.test.passed`              | Individual test passed               |
-| `swe.test.failed`              | Individual test failed               |
-| `swe.test.coverage_report`     | Coverage report generated            |
+| Class                      | Description               |
+| :------------------------- | :------------------------ |
+| `swe.test.suite_started`   | Test suite started        |
+| `swe.test.suite_completed` | Test suite completed      |
+| `swe.test.passed`          | Individual test passed    |
+| `swe.test.failed`          | Individual test failed    |
+| `swe.test.coverage_report` | Coverage report generated |
 
 #### Review Events (`swe.review.*`)
 
-| Class                          | Description                          |
-|:-------------------------------|:-------------------------------------|
-| `swe.review.requested`         | Review requested                     |
-| `swe.review.comment`           | Review comment added                 |
-| `swe.review.approved`          | Review approved                      |
-| `swe.review.changes_requested` | Changes requested                    |
+| Class                          | Description          |
+| :----------------------------- | :------------------- |
+| `swe.review.requested`         | Review requested     |
+| `swe.review.comment`           | Review comment added |
+| `swe.review.approved`          | Review approved      |
+| `swe.review.changes_requested` | Changes requested    |
 
 #### CI/CD Events (`swe.ci.*`)
 
-| Class                          | Description                          |
-|:-------------------------------|:-------------------------------------|
-| `swe.ci.pipeline_started`      | Pipeline started                     |
-| `swe.ci.pipeline_completed`    | Pipeline completed                   |
-| `swe.ci.job_started`           | Job started                          |
-| `swe.ci.job_completed`         | Job completed                        |
-| `swe.ci.artifact_published`    | Artifact published                   |
+| Class                       | Description        |
+| :-------------------------- | :----------------- |
+| `swe.ci.pipeline_started`   | Pipeline started   |
+| `swe.ci.pipeline_completed` | Pipeline completed |
+| `swe.ci.job_started`        | Job started        |
+| `swe.ci.job_completed`      | Job completed      |
+| `swe.ci.artifact_published` | Artifact published |
 
 ---
 
@@ -520,33 +523,33 @@ This schema is designed to be compatible with industry standard formats.
 Attributes map directly to OpenTelemetry semantic conventions where
 applicable. Use the `otel.*` prefix for OTel-specific attributes.
 
-| ACES Attribute      | OTel Equivalent                |
-|:--------------------|:-------------------------------|
-| `agent.name`        | `service.name`                 |
-| `action.duration_ms`| `duration` (span field)        |
-| `target.address`    | `net.peer.name`                |
-| `target.port`       | `net.peer.port`                |
+| ACES Attribute       | OTel Equivalent         |
+| :------------------- | :---------------------- |
+| `agent.name`         | `service.name`          |
+| `action.duration_ms` | `duration` (span field) |
+| `target.address`     | `net.peer.name`         |
+| `target.port`        | `net.peer.port`         |
 
 ### OCSF
 
 Security extension events can be mapped to OCSF classes.
 
-| ACES Event Class                  | OCSF Category / Class          |
-|:----------------------------------|:-------------------------------|
-| `security.attack.credential_access` | Identity Activity / Authentication |
-| `security.defense.alert`          | Security Finding / Detection Finding |
-| `environment.network_event`       | Network Activity               |
+| ACES Event Class                    | OCSF Category / Class                |
+| :---------------------------------- | :----------------------------------- |
+| `security.attack.credential_access` | Identity Activity / Authentication   |
+| `security.defense.alert`            | Security Finding / Detection Finding |
+| `environment.network_event`         | Network Activity                     |
 
 ### ECS (Elastic Common Schema)
 
 Attributes can be mapped to ECS fields.
 
-| ACES Attribute         | ECS Equivalent              |
-|:-----------------------|:----------------------------|
-| `agent.name`           | `agent.name`                |
-| `target.address`       | `destination.ip`            |
-| `target.port`          | `destination.port`          |
-| `credential.username`  | `user.name`                 |
+| ACES Attribute        | ECS Equivalent     |
+| :-------------------- | :----------------- |
+| `agent.name`          | `agent.name`       |
+| `target.address`      | `destination.ip`   |
+| `target.port`         | `destination.port` |
+| `credential.username` | `user.name`        |
 
 ---
 
@@ -638,13 +641,13 @@ span:
 
 ## Affected Repos
 
-| Repository          | Changes Required                                    |
-|:--------------------|:----------------------------------------------------|
-| `aces-schema`       | JSON Schema for observability schema                |
-| `aces-telemetry`    | Schema validation, format conversion                |
-| `aces-agent-sdk`    | Span/event emission with schema compliance          |
-| `aces-evaluation`   | Schema-aware objective evaluation                   |
-| `aces-dashboards`   | Pre-built dashboards using schema attributes        |
+| Repository        | Changes Required                             |
+| :---------------- | :------------------------------------------- |
+| `aces-schema`     | JSON Schema for observability schema         |
+| `aces-telemetry`  | Schema validation, format conversion         |
+| `aces-agent-sdk`  | Span/event emission with schema compliance   |
+| `aces-evaluation` | Schema-aware objective evaluation            |
+| `aces-dashboards` | Pre-built dashboards using schema attributes |
 
 ---
 
@@ -668,10 +671,10 @@ span:
 
 ## Cross-References
 
-| Document                                | Relationship                           |
-|:----------------------------------------|:---------------------------------------|
-| RFC-0001: Environment Infrastructure    | Defines telemetry backends and sinks   |
-| RFC-0002: Experiment Specification      | References schema for observations     |
-| RFC-0004: Security Domain Schema        | Defines security extension attributes, event classes, and correlation patterns (§16) |
-| OpenTelemetry Semantic Conventions      | Attribute naming alignment             |
-| OCSF Schema                             | Security event structure alignment     |
+| Document                             | Relationship                                                                         |
+| :----------------------------------- | :----------------------------------------------------------------------------------- |
+| RFC-0001: Environment Infrastructure | Defines telemetry backends and sinks                                                 |
+| RFC-0002: Experiment Specification   | References schema for observations                                                   |
+| RFC-0004: Security Domain Schema     | Defines security extension attributes, event classes, and correlation patterns (§16) |
+| OpenTelemetry Semantic Conventions   | Attribute naming alignment                                                           |
+| OCSF Schema                          | Security event structure alignment                                                   |
