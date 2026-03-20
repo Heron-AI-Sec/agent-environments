@@ -54,6 +54,17 @@ Fields across this schema are categorized by stability tier, which determines ho
 | `CapabilityType`       | growing         | `shell`, `tool`, `api`, `protocol`                                          |
 | `SourceType`           | growing         | `telemetry`, `local`, `api`                                                 |
 | `ModelProvider`        | growing         | `anthropic`, `openai`, `deepseek`, `xai`, `google`, `mistral`               |
+| `TrustLevel`           | extensible-enum | `trusted`, `untrusted`, `sandboxed`                                         |
+| `LogicalOperator`      | extensible-enum | `all`, `any`, `none`, `one`                                                 |
+
+**`LogicalOperator` semantics:**
+
+| Value  | Meaning | Evaluates to `true` when |
+| :----- | :------ | :----------------------- |
+| `all`  | Every condition must pass | All conditions in `conditions` are true |
+| `any`  | At least one must pass | At least one condition in `conditions` is true |
+| `none` | No condition must pass | Every condition in `conditions` is false |
+| `one`  | Exactly one must pass | Exactly one condition in `conditions` is true |
 
 ---
 
@@ -132,6 +143,8 @@ References an RFC-0001 environment that the experiment executes against.
 | :-------- | :----- | :------- | :-------------------------------------------------- | :--------------- |
 | `name`    | String | Yes      | Environment name (unique identifier from metadata). | `ad-range`       |
 | `version` | String | No       | Version constraint.                                 | `1.0.0`, `>=1.0` |
+| `display_name` | String | No       | Human-readable label | `AD Attack Range` |
+
 
 ### Integration with RFC-0001
 
@@ -178,7 +191,9 @@ Agents are defined as a map keyed by name (the unique identifier).
 | `depends_on`    | Array     | No       | Agents that must complete first.    | `[setup-agent.lifecycle.goal_reached]`    |
 | `communication` | Object    | No       | Inter-agent communication.          | See Communication                         |
 | `lifecycle`     | Object    | No       | Spawn/termination conditions.       | See Lifecycle                             |
+| `trust_level`   | TrustLevel | No      | Trust level of the agent            | see [Type Definitions](#type-definitions) |
 | `labels`        | Object    | No       | Arbitrary key-value labels.         | `{team: red, role: recon}`                |
+
 
 ### Agent Types
 
@@ -201,6 +216,7 @@ LLM configuration for `llm` and `hybrid` agents.
 | `parameters` | Object        | No       | Key-value store of parameters | `{temperature: 0.7, top-p: 0.95`          |
 | `max_tokens` | Integer       | No       | Maximum response tokens.      | `4096`                                    |
 
+
 ### Observation
 
 What the agent can perceive. Sources reference RFC-0001 telemetry or local
@@ -208,8 +224,9 @@ agent feedback. Event formats and attributes follow RFC-0003 schema conventions.
 
 | Property  | Type   | Required | Description                      | Example                    |
 | :-------- | :----- | :------- | :------------------------------- | :------------------------- |
-| `sources` | Array  | No       | Data sources available to agent. | See Source Types           |
+| `sources` | Array\<Source\>  | No       | Data sources available to agent. | See Source Types           |
 | `schema`  | Object | No       | RFC-0003 schema reference.       | `{extensions: [security]}` |
+
 
 #### Source Types
 
@@ -313,6 +330,9 @@ agents:
     model:
       provider: anthropic
       name: claude-sonnet-4-20250514
+      parameters:
+        temperature: 0.7
+        top_p: 0.95
     observation:
       sources:
         - type: local
@@ -429,11 +449,12 @@ condition:
 
 #### Compound Conditions
 
-Use `all` (AND) or `any` (OR) for compound logic:
+Set `logical` to a `LogicalOperator` value to combine multiple conditions. See [Type Definitions](#type-definitions) for the full set and semantics.
 
 ```yaml
 condition:
-  all:
+  logical: all
+  conditions:
     - type: state
       expr: "task.completed == true"
     - type: metric
@@ -442,7 +463,8 @@ condition:
       value: 0.9
 
 condition:
-  any:
+  logical: any
+  conditions:
     - type: event
       event_type: goal_a
     - type: event
@@ -504,14 +526,31 @@ Injects are defined as a map keyed by name (the unique identifier).
 
 ### Inject Types
 
-| Type       | Description               | Payload Fields       |
-| :--------- | :------------------------ | :------------------- |
-| `event`    | Emit event to telemetry   | `event_type`, `data` |
-| `state`    | Modify environment state  | `target`, `mutation` |
-| `message`  | Send message to agent     | `content`, `channel` |
-| `artifact` | Place file in environment | `path`, `content`    |
-| `delay`    | Pause execution           | `duration`           |
-| `command`  | Execute command           | `command`, `flags`   |
+
+| Type          | Description                   | Payload Fields              |
+|:--------------|:------------------------------|:----------------------------|
+| `event`       | Emit event to telemetry       | `event_type`, `data`        |
+| `state`       | Modify environment state      | `target`, `mutation`        |
+| `message`     | Send message to agent         | `content`, `channel`        |
+| `artifact`    | Place file in environment     | `path`, `content`           |
+| `delay`       | Pause execution               | `duration`                  |
+| `custom`      | Custom inject via evaluator   | `evaluator`, `params`       |
+
+#### Custom Injects
+
+For inject types not covered above, use `type: custom` with an evaluator:
+
+```yaml
+injects:
+  run-custom-script:
+    type: custom
+    payload:
+      evaluator: my_custom_inject
+      params:
+        command: "bash /tmp/setup.sh"
+        target: server-01
+```
+
 
 ### Timing
 
@@ -521,6 +560,8 @@ Injects are defined as a map keyed by name (the unique identifier).
 | `delay`  | String | No       | Delay after trigger.           | `30s`         |
 | `at`     | String | No       | Absolute time into experiment. | `10m`         |
 | `after`  | String | No       | Execute after another inject.  | `inject-1`    |
+
+> **Note:** `at` is relative to experiment start time. Use `on_enter`/`on_exit` on phases when you need an inject tied to a phase transition rather than an absolute time. For example, `timing.at: 0m` fires at the start of the experiment, while `on_enter` fires when that specific phase begins, which may be well into the experiment.
 
 ### Injects Example
 
