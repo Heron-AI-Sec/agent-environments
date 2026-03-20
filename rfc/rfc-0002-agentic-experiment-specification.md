@@ -59,13 +59,13 @@ Fields across this schema are categorized by stability tier, which determines ho
 
 ## Schema Overview
 
-| Section       | Purpose                                            |
-| :------------ | :------------------------------------------------- |
-| `environment` | Reference to RFC-0001 infrastructure               |
-| `agents`      | Autonomous entities that interact with environment |
-| `objectives`  | Success criteria and scoring                       |
-| `injects`     | Scripted events injected during execution          |
-| `runtime`     | Execution configuration: phases, throttling, state |
+| Section       | Purpose                                                               |
+| :------------ | :-------------------------------------------------------------------- |
+| `environment` | Reference to RFC-0001 infrastructure                                  |
+| `agents`      | Autonomous entities that interact with environment and other entities |
+| `objectives`  | Success criteria and scoring                                          |
+| `injects`     | Scripted events injected during execution                             |
+| `runtime`     | Execution configuration: phases, throttling, state                    |
 
 ---
 
@@ -128,10 +128,10 @@ References an RFC-0001 environment that the experiment executes against.
 
 ### Environment Reference
 
-| Property  | Type   | Required | Description                       | Example          |
-| :-------- | :----- | :------- | :-------------------------------- | :--------------- |
-| `name`    | String | Yes      | Environment name (from metadata). | `ad-range`       |
-| `version` | String | No       | Version constraint.               | `1.0.0`, `>=1.0` |
+| Property  | Type   | Required | Description                                         | Example          |
+| :-------- | :----- | :------- | :-------------------------------------------------- | :--------------- |
+| `name`    | String | Yes      | Environment name (unique identifier from metadata). | `ad-range`       |
+| `version` | String | No       | Version constraint.                                 | `1.0.0`, `>=1.0` |
 
 ### Integration with RFC-0001
 
@@ -175,7 +175,7 @@ Agents are defined as a map keyed by name (the unique identifier).
 | `actions`       | Object    | No       | What the agent can do.              | See Actions                               |
 | `context`       | Object    | No       | Starting position and targets.      | See Context                               |
 | `resources`     | Object    | No       | Compute requirements.               | See Resources                             |
-| `depends_on`    | Array     | No       | Agents that must complete first.    | `[setup-agent]`                           |
+| `depends_on`    | Array     | No       | Agents that must complete first.    | `[setup-agent.lifecycle.goal_reached]`    |
 | `communication` | Object    | No       | Inter-agent communication.          | See Communication                         |
 | `lifecycle`     | Object    | No       | Spawn/termination conditions.       | See Lifecycle                             |
 | `labels`        | Object    | No       | Arbitrary key-value labels.         | `{team: red, role: recon}`                |
@@ -194,12 +194,12 @@ Agents are defined as a map keyed by name (the unique identifier).
 
 LLM configuration for `llm` and `hybrid` agents.
 
-| Property      | Type          | Required | Description              | Example                                   |
-| :------------ | :------------ | :------- | :----------------------- | :---------------------------------------- |
-| `provider`    | ModelProvider | No       | Model provider.          | see [Type Definitions](#type-definitions) |
-| `name`        | String        | No       | Model identifier.        | `claude-sonnet-4-20250514`                |
-| `temperature` | Float         | No       | Sampling temperature.    | `0.7`                                     |
-| `max_tokens`  | Integer       | No       | Maximum response tokens. | `4096`                                    |
+| Property     | Type          | Required | Description                   | Example                                   |
+| :----------- | :------------ | :------- | :---------------------------- | :---------------------------------------- |
+| `provider`   | ModelProvider | No       | Model provider.               | see [Type Definitions](#type-definitions) |
+| `name`       | String        | No       | Model identifier.             | `claude-sonnet-4-20250514`                |
+| `parameters` | Object        | No       | Key-value store of parameters | `{temperature: 0.7, top-p: 0.95`          |
+| `max_tokens` | Integer       | No       | Maximum response tokens.      | `4096`                                    |
 
 ### Observation
 
@@ -296,6 +296,7 @@ Agent spawn and termination conditions.
 | `max_iterations` | Integer       | No       | Maximum action iterations.       | `1000`                                    |
 | `timeout`        | String        | No       | Maximum runtime.                 | `1h`                                      |
 | `terminate_on`   | String        | No       | Objective that terminates agent. | `goal-reached`                            |
+| `parameters`     | Object        | No       | Key-value store of parameters    | `{temperature: 0.7, top-p: 0.95`          |
 | `restart_policy` | RestartPolicy | No       | Behavior on failure.             | see [Type Definitions](#type-definitions) |
 
 ### Agents Example
@@ -510,6 +511,7 @@ Injects are defined as a map keyed by name (the unique identifier).
 | `message`  | Send message to agent     | `content`, `channel` |
 | `artifact` | Place file in environment | `path`, `content`    |
 | `delay`    | Pause execution           | `duration`           |
+| `command`  | Execute command           | `command`, `flags`   |
 
 ### Timing
 
