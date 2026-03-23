@@ -59,12 +59,12 @@ Fields across this schema are categorized by stability tier, which determines ho
 
 **`LogicalOperator` semantics:**
 
-| Value  | Meaning | Evaluates to `true` when |
-| :----- | :------ | :----------------------- |
-| `all`  | Every condition must pass | All conditions in `conditions` are true |
-| `any`  | At least one must pass | At least one condition in `conditions` is true |
-| `none` | No condition must pass | Every condition in `conditions` is false |
-| `one`  | Exactly one must pass | Exactly one condition in `conditions` is true |
+| Value  | Meaning                   | Evaluates to `true` when                       |
+| :----- | :------------------------ | :--------------------------------------------- |
+| `all`  | Every condition must pass | All conditions in `conditions` are true        |
+| `any`  | At least one must pass    | At least one condition in `conditions` is true |
+| `none` | No condition must pass    | Every condition in `conditions` is false       |
+| `one`  | Exactly one must pass     | Exactly one condition in `conditions` is true  |
 
 ---
 
@@ -139,12 +139,11 @@ References an RFC-0001 environment that the experiment executes against.
 
 ### Environment Reference
 
-| Property  | Type   | Required | Description                                         | Example          |
-| :-------- | :----- | :------- | :-------------------------------------------------- | :--------------- |
-| `name`    | String | Yes      | Environment name (unique identifier from metadata). | `ad-range`       |
-| `version` | String | No       | Version constraint.                                 | `1.0.0`, `>=1.0` |
-| `display_name` | String | No       | Human-readable label | `AD Attack Range` |
-
+| Property       | Type   | Required | Description                                         | Example           |
+| :------------- | :----- | :------- | :-------------------------------------------------- | :---------------- |
+| `name`         | String | Yes      | Environment name (unique identifier from metadata). | `ad-range`        |
+| `version`      | String | No       | Version constraint.                                 | `1.0.0`, `>=1.0`  |
+| `display_name` | String | No       | Human-readable label                                | `AD Attack Range` |
 
 ### Integration with RFC-0001
 
@@ -178,22 +177,21 @@ goals. They execute on the `agent_platform` defined in RFC-0001.
 
 Agents are defined as a map keyed by name (the unique identifier).
 
-| Property        | Type      | Required | Description                         | Example                                   |
-| :-------------- | :-------- | :------- | :---------------------------------- | :---------------------------------------- |
-| `display_name`  | String    | No       | Human-readable label.               | `Research Agent`                          |
-| `type`          | AgentType | Yes      | Agent paradigm.                     | see [Type Definitions](#type-definitions) |
-| `goal`          | String    | Yes      | Natural language objective.         | `Analyze and report findings`             |
-| `model`         | Object    | No       | LLM configuration (for llm/hybrid). | See Model                                 |
-| `observation`   | Object    | No       | What the agent can perceive.        | See Observation                           |
-| `actions`       | Object    | No       | What the agent can do.              | See Actions                               |
-| `context`       | Object    | No       | Starting position and targets.      | See Context                               |
-| `resources`     | Object    | No       | Compute requirements.               | See Resources                             |
-| `depends_on`    | Array     | No       | Agents that must complete first.    | `[setup-agent.lifecycle.goal_reached]`    |
-| `communication` | Object    | No       | Inter-agent communication.          | See Communication                         |
-| `lifecycle`     | Object    | No       | Spawn/termination conditions.       | See Lifecycle                             |
-| `trust_level`   | TrustLevel | No      | Trust level of the agent            | see [Type Definitions](#type-definitions) |
-| `labels`        | Object    | No       | Arbitrary key-value labels.         | `{team: red, role: recon}`                |
-
+| Property        | Type       | Required | Description                         | Example                                   |
+| :-------------- | :--------- | :------- | :---------------------------------- | :---------------------------------------- |
+| `display_name`  | String     | No       | Human-readable label.               | `Research Agent`                          |
+| `type`          | AgentType  | Yes      | Agent paradigm.                     | see [Type Definitions](#type-definitions) |
+| `goal`          | String     | Yes      | Natural language objective.         | `Analyze and report findings`             |
+| `model`         | Object     | No       | LLM configuration (for llm/hybrid). | See Model                                 |
+| `observation`   | Object     | No       | What the agent can perceive.        | See Observation                           |
+| `actions`       | Object     | No       | What the agent can do.              | See Actions                               |
+| `context`       | Object     | No       | Starting position and targets.      | See Context                               |
+| `resources`     | Object     | No       | Compute requirements.               | See Resources                             |
+| `depends_on`    | Array      | No       | Agents that must complete first.    | `[setup-agent.lifecycle.goal_reached]`    |
+| `communication` | Object     | No       | Inter-agent communication.          | See Communication                         |
+| `lifecycle`     | Object     | No       | Spawn/termination conditions.       | See Lifecycle                             |
+| `trust_level`   | TrustLevel | No       | Trust level of the agent            | see [Type Definitions](#type-definitions) |
+| `labels`        | Object     | No       | Arbitrary key-value labels.         | `{team: red, role: recon}`                |
 
 ### Agent Types
 
@@ -216,17 +214,15 @@ LLM configuration for `llm` and `hybrid` agents.
 | `parameters` | Object        | No       | Key-value store of parameters | `{temperature: 0.7, top-p: 0.95`          |
 | `max_tokens` | Integer       | No       | Maximum response tokens.      | `4096`                                    |
 
-
 ### Observation
 
 What the agent can perceive. Sources reference RFC-0001 telemetry or local
 agent feedback. Event formats and attributes follow RFC-0003 schema conventions.
 
-| Property  | Type   | Required | Description                      | Example                    |
-| :-------- | :----- | :------- | :------------------------------- | :------------------------- |
-| `sources` | Array\<Source\>  | No       | Data sources available to agent. | See Source Types           |
-| `schema`  | Object | No       | RFC-0003 schema reference.       | `{extensions: [security]}` |
-
+| Property  | Type            | Required | Description                      | Example                    |
+| :-------- | :-------------- | :------- | :------------------------------- | :------------------------- |
+| `sources` | Array\<Source\> | No       | Data sources available to agent. | See Source Types           |
+| `schema`  | Object          | No       | RFC-0003 schema reference.       | `{extensions: [security]}` |
 
 #### Source Types
 
@@ -526,15 +522,14 @@ Injects are defined as a map keyed by name (the unique identifier).
 
 ### Inject Types
 
-
-| Type          | Description                   | Payload Fields              |
-|:--------------|:------------------------------|:----------------------------|
-| `event`       | Emit event to telemetry       | `event_type`, `data`        |
-| `state`       | Modify environment state      | `target`, `mutation`        |
-| `message`     | Send message to agent         | `content`, `channel`        |
-| `artifact`    | Place file in environment     | `path`, `content`           |
-| `delay`       | Pause execution               | `duration`                  |
-| `custom`      | Custom inject via evaluator   | `evaluator`, `params`       |
+| Type       | Description                 | Payload Fields        |
+| :--------- | :-------------------------- | :-------------------- |
+| `event`    | Emit event to telemetry     | `event_type`, `data`  |
+| `state`    | Modify environment state    | `target`, `mutation`  |
+| `message`  | Send message to agent       | `content`, `channel`  |
+| `artifact` | Place file in environment   | `path`, `content`     |
+| `delay`    | Pause execution             | `duration`            |
+| `custom`   | Custom inject via evaluator | `evaluator`, `params` |
 
 #### Custom Injects
 
@@ -550,7 +545,6 @@ injects:
         command: "bash /tmp/setup.sh"
         target: server-01
 ```
-
 
 ### Timing
 
