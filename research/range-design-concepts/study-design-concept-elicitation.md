@@ -135,10 +135,7 @@ Let the participant describe their work without imposing categories. Listen for
 what concepts they name, what distinctions they draw, what sequence they follow,
 what they emphasize.
 
-> Q
->
-> 1. Think of a recent cyber range you built or configured—for a training
->
+> Q1. Think of a recent cyber range you built or configured—for a training
 > exercise, an evaluation, a competition, whatever the use case was. Walk me
 > through the process from the beginning—from when you first understood what was
 > needed to when participants or agents were running in it.
@@ -146,10 +143,7 @@ what they emphasize.
 Probes if the narrative stalls: "What happened next?" / "Say more about that
 part." / "What were you working with at that point?"
 
-> Q
->
-> 1. When you think about everything that goes into specifying that
->
+> Q1. When you think about everything that goes into specifying that
 > range—all the different things you had to define or set up—how would you
 > describe the main pieces?
 
@@ -160,100 +154,60 @@ The following are candidate probes, not a script.
 
 On boundaries:
 
-> Q
->
-> 1. You mentioned [X] and [Y]. Are those the same kind of thing, or
->
+> Q1. You mentioned [X] and [Y]. Are those the same kind of thing, or
 > different? What makes them different?
-
-> Q
 >
-> 1. If you had to explain to a new team member what they need to specify to
->
+> Q2. If you had to explain to a new team member what they need to specify to
 > recreate this environment, how would you organize it?
 
 On the specification gap:
 
-> Q
->
-> 1. Was there anything about this range you could not specify
->
+> Q1. Was there anything about this range you could not specify
 > declaratively—that required scripts, manual steps, or institutional
 > knowledge?
-
-> Q
 >
-> 1. If you had a specification language that could describe anything about a
->
+> Q2. If you had a specification language that could describe anything about a
 > range, what would you want it to express that current tools do not?
 
 On reuse and composition:
 
-> Q
+> Q1. Have you reused parts of one range in another? How? What was hard?
 >
-> 1. Have you reused parts of one range in another? How? What was hard?
-
-> Q
->
-> 1. If you needed ten variations of the same range—same topology, different
->
+> Q2. If you needed ten variations of the same range—same topology, different
 > configurations—how would you do that today?
 
 On reproducibility:
 
-> Q
->
-> 1. If another team needed to reproduce this range exactly, what would you
->
+> Q1. If another team needed to reproduce this range exactly, what would you
 > give them? What would be hardest to capture?
-
-> Q
 >
-> 1. What must be identical between runs for results to be comparable? What
->
+> Q2. What must be identical between runs for results to be comparable? What
 > is allowed to vary?
 
 On the range–exercise boundary:
 
-> Q
->
-> 1. When you think about "the range" versus "the exercise" or "the
->
+> Q1. When you think about "the range" versus "the exercise" or "the
 > scenario"—where does one end and the other begin? Or is that not how you
 > think about it?
-
-> Q
 >
-> 1. If I asked you to separate infrastructure from scenario, would that
->
+> Q2. If I asked you to separate infrastructure from scenario, would that
 > distinction mean something to you? Where would you draw the line?
 
 On AI and automation:
 
-> Q
->
-> 1. Do you build ranges that involve AI agents—offensive, defensive, or
->
+> Q1. Do you build ranges that involve AI agents—offensive, defensive, or
 > both? If so, does that change what you need to specify compared to a
 > range built for human participants?
 
 **Phase 3: Closing (10–15 min)**
 
-> Q
->
-> 1. Across all the ranges you have built, is there a concept or concern
->
+> Q1. Across all the ranges you have built, is there a concept or concern
 > that recurs and is not well handled by existing tools?
-
-> Q
 >
-> 1. If you were designing a standard for specifying cyber ranges—what would
->
+> Q2. If you were designing a standard for specifying cyber ranges—what would
 > matter most to get right?
-
-> Q
 >
-> 1. Is there something I have not asked about that you think is important?
+> Q3. Is there something I have not asked about that you think is important?
 
 ### 5.3 Guide Evolution
 
@@ -310,7 +264,6 @@ architecture is genuinely hard.
 
 ## 8. Rigor
 
-
 | Concern         | Approach                                                                                                                  |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Credibility     | Member checking: participants review emerging taxonomy. Triangulation against existing SDL surveys (Garg 2025, Ear 2023). |
@@ -318,7 +271,6 @@ architecture is genuinely hard.
 | Dependability   | Full audit trail: memos, coding journal, guide evolution log, theoretical sampling decisions.                             |
 | Confirmability  | Every category grounded in data with exemplar quotes. Reflexive journaling. Disconfirming evidence reported.              |
 | Saturation      | Category emergence tracked per interview. Saturation curve reported. Stopping decision documented.                        |
-
 
 ## 9. Reflexivity
 
@@ -342,7 +294,6 @@ populations, and no sensitive personal data is collected.
 
 ## 11. Timeline
 
-
 | Phase               | Activities                                                              |
 | ------------------- | ----------------------------------------------------------------------- |
 | Preparation         | Seed recruitment, pilot (1–2 interviews for guide refinement)           |
@@ -352,7 +303,6 @@ populations, and no sensitive personal data is collected.
 | Checkpoint          | Theoretical coding, cross-participant comparison, saturation assessment |
 | Round 3 (if needed) | 3–5 interviews targeting underdeveloped categories                      |
 | Integration         | Taxonomy development, member checking, write-up                         |
-
 
 ## 12. Publication
 
@@ -453,4 +403,3 @@ Zhang, T., Alluri, R., Tran, N., Sangpisit, R., Yiorkadjis, P., Osele, K.,
 Raghupathi, G., Boneh, D., Ho, D.E., and Liang, P. (2025). CyBench: A
 Framework for Evaluating Cybersecurity Capabilities and Risks of Language
 Models. *ICLR 2025.* [arXiv:2408.08926](https://arxiv.org/abs/2408.08926)
-
