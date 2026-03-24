@@ -758,6 +758,11 @@ Scenario-specific dimensions (e.g., `mitre.tactic`, `attack_phase`, `attack_team
 are defined in RFC-0002 experiments. When `schema.extensions` includes `security`,
 additional security-related dimensions are available per RFC-0003.
 
+Where defensive tooling emits alerts, findings, or evidence artifacts,
+implementations SHOULD normalize them to OCSF-compatible records when practical.
+ACES-specific control evaluation metadata is defined in the
+[Defensive Control Evaluation Metadata appendix](./rfc-defense-appendix-draft-0.1.md).
+
 ### Dashboards
 
 Dashboard configurations for visualization.
@@ -1378,6 +1383,7 @@ Rejected: Separating them enables environment reuse across experiments.
 | RFC-0002: Experiment Specification    | Defines what happens in environments: scenario roles, objectives, agent coordination |
 | RFC-0003: Observability Schema        | Defines telemetry semantics and attributes |
 | RFC-0004: Security Domain Schema      | Attack relationship types, credential kinds, blue team roles for security scenarios |
+| [Defensive Control Evaluation Metadata Appendix](./rfc-defense-appendix-draft-0.1.md) | ACES-specific evaluation metadata layered on top of OCSF-compatible defensive telemetry, findings, and evidence artifacts |
 | RFC-0005: Agent SDK (future)          | Agent implementation interfaces        |
 
 ---
@@ -1621,6 +1627,11 @@ For AD environments, use the security extension from RFC-0003 which defines:
 
 Scenario-specific attributes (MITRE ATT&CK: `mitre.tactic`, `mitre.technique.id`, etc.)
 are defined in RFC-0002 experiments, not in the environment specification.
+
+For defensive logs, alerts, findings, and evidence artifacts, prefer
+OCSF-compatible normalization where applicable. The Defensive Control
+Evaluation Metadata appendix adds scenario-evaluation semantics such as
+control expectations, reproducibility metadata, and per-action outcomes.
 
 ---
 
