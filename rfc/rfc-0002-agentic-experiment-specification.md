@@ -334,6 +334,9 @@ Agent spawn and termination conditions.
 | Property         | Type          | Required | Description                      | Example                                   |
 | :--------------- | :------------ | :------- | :------------------------------- | :---------------------------------------- |
 | `max_iterations` | Integer       | No       | Maximum action iterations.       | `1000`                                    |
+| `max_retries`    | Integer       | No       | Maximum retry attempts on failure. | `3`                                     |
+| `retry_backoff`  | String        | No       | Backoff strategy between retries. | `none`, `linear`, `exponential`          |
+| `loop_detection` | Boolean       | No       | Enable detection of infinite loops. | `true`                                 |
 | `timeout`        | String        | No       | Maximum runtime.                 | `1h`                                      |
 | `terminate_on`   | String        | No       | Objective that terminates agent. | `goal-reached`                            |
 | `restart_policy` | RestartPolicy | No       | Behavior on failure.             | see [Type Definitions](#type-definitions) |
