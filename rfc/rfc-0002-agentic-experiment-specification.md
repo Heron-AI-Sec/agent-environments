@@ -186,7 +186,7 @@ Agents are defined as a map keyed by name (the unique identifier).
 | `knowledge`     | Object     | No       | Reference materials for the agent.  | See Knowledge                             |
 | `observation`   | Object     | No       | What the agent can perceive.        | See Observation                           |
 | `actions`       | Object     | No       | What the agent can do.              | See Actions                               |
-| `context`       | Object     | No       | Starting position and targets.      | See Context                               |
+| `execution_context` | Object | No       | Starting position and targets.      | See Execution Context                     |
 | `resources`     | Object     | No       | Compute requirements.               | See Resources                             |
 | `depends_on`    | Array      | No       | Agents that must complete first.    | `[setup-agent.lifecycle.goal_reached]`    |
 | `communication` | Object     | No       | Inter-agent communication.          | See Communication                         |
@@ -212,6 +212,7 @@ LLM configuration for `llm` and `hybrid` agents.
 | :----------- | :------------ | :------- | :---------------------------- | :---------------------------------------- |
 | `provider`   | ModelProvider | No       | Model provider.               | see [Type Definitions](#type-definitions) |
 | `name`       | String        | No       | Model identifier.             | `claude-sonnet-4-20250514`                |
+| `version`    | String        | No       | Model version for reproducibility. | `20250514`                           |
 | `parameters` | Object        | No       | Key-value store of parameters | `{temperature: 0.7, top_p: 0.95}`         |
 | `max_tokens` | Integer       | No       | Maximum response tokens.      | `4096`                                    |
 
@@ -282,9 +283,10 @@ What the agent can do.
 
 > **Note:** This list is illustrative, not exhaustive. `CapabilityType` is a `growing` tier type, so new values (e.g., `mcp`, `skill`) are expected and accepted without the `x-` prefix.
 
-### Context
+### Execution Context
 
-Where the agent operates within the RFC-0001 environment.
+Where the agent operates within the RFC-0001 environment. Named `execution_context`
+to distinguish from "context" in the LLM sense (conversation history, RAG context).
 
 | Property   | Type   | Required | Description                           | Example                  |
 | :--------- | :----- | :------- | :------------------------------------ | :----------------------- |
@@ -366,7 +368,7 @@ agents:
           allowed: [bash]
         - type: tool
           allowed: [nmap, curl]
-    context:
+    execution_context:
       node: attacker-01
       groups: [servers]
       identity:
@@ -772,7 +774,7 @@ agents:
           allowed: [bash]
         - type: tool
           allowed: [nmap, curl, dig]
-    context:
+    execution_context:
       node: workstation-01
       groups: [servers]
     resources:
