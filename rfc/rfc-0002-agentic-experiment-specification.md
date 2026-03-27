@@ -183,6 +183,7 @@ Agents are defined as a map keyed by name (the unique identifier).
 | `type`          | AgentType  | Yes      | Agent paradigm.                     | see [Type Definitions](#type-definitions) |
 | `goal`          | String     | Yes      | Natural language objective.         | `Analyze and report findings`             |
 | `model`         | Object     | No       | LLM configuration (for llm/hybrid). | See Model                                 |
+| `knowledge`     | Object     | No       | Reference materials for the agent.  | See Knowledge                             |
 | `observation`   | Object     | No       | What the agent can perceive.        | See Observation                           |
 | `actions`       | Object     | No       | What the agent can do.              | See Actions                               |
 | `context`       | Object     | No       | Starting position and targets.      | See Context                               |
@@ -213,6 +214,17 @@ LLM configuration for `llm` and `hybrid` agents.
 | `name`       | String        | No       | Model identifier.             | `claude-sonnet-4-20250514`                |
 | `parameters` | Object        | No       | Key-value store of parameters | `{temperature: 0.7, top_p: 0.95}`         |
 | `max_tokens` | Integer       | No       | Maximum response tokens.      | `4096`                                    |
+
+### Knowledge
+
+Reference materials and knowledge bases available to the agent.
+
+| Property         | Type   | Required | Description                              | Example                        |
+| :--------------- | :----- | :------- | :--------------------------------------- | :----------------------------- |
+| `documents`      | Array  | No       | Paths or URLs to reference documents.    | `[./guides/network-recon.md]`  |
+| `embeddings_ref` | String | No       | Reference to vector store (RFC-0001).    | `telemetry.sinks.vector-db`    |
+| `schemas`        | Array  | No       | Schema files for structured knowledge.   | `[./schemas/network.json]`     |
+| `instructions`   | String | No       | Path to additional system instructions.  | `./prompts/recon-agent.md`     |
 
 ### Observation
 
@@ -328,6 +340,9 @@ agents:
       parameters:
         temperature: 0.7
         top_p: 0.95
+    knowledge:
+      documents: [./guides/network-recon.md]
+      embeddings_ref: telemetry.sinks.vector-db
     observation:
       sources:
         - type: local
