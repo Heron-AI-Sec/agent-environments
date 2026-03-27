@@ -66,7 +66,7 @@ Identify the agent producing or triggering telemetry.
 
 | Attribute           | Type   | Description                | Example                      |
 | :------------------ | :----- | :------------------------- | :--------------------------- |
-| `agent.id`          | String | Agent identifier           | `explorer-agent`             |
+| `agent.name`        | String | Agent name — map key from RFC-0002 `agents`. | `explorer-agent`             |
 | `agent.type`        | String | Agent paradigm             | `llm`, `rl`, `scripted`      |
 | `agent.role`        | String | Functional role            | `orchestrator`, `specialist` |
 | `agent.instance_id` | String | Unique instance identifier | `explorer-agent-7f8a9b`      |
@@ -251,7 +251,7 @@ All spans SHOULD include:
 | Attribute          | Required | Description                 |
 | :----------------- | :------- | :-------------------------- |
 | `experiment.name`  | Yes      | Experiment identifier       |
-| `agent.id`       | Yes      | Agent that created the span |
+| `agent.name`     | Yes      | Agent that created the span |
 | `experiment.phase` | Yes      | Current phase               |
 
 Action spans SHOULD also include:
@@ -292,7 +292,7 @@ agent.decision.*     (one reasoning cycle — what the agent decided to do)
 | Attribute                          | Required | Description                                                       |
 | :--------------------------------- | :------- | :---------------------------------------------------------------- |
 | `agent.decision.id`                | Yes      | Unique identifier for this decision record.                       |
-| `agent.decision.agent`             | Yes      | Agent that made this decision. References `agent.id` (RFC-0002). |
+| `agent.decision.agent`             | Yes      | Agent that made this decision. References `agent.name` (RFC-0002). |
 | `agent.decision.timestamp`         | Yes      | When the decision was made (ISO 8601).                            |
 | `agent.decision.objective_ref`     | Yes      | RFC-0002 objective the agent was pursuing.                        |
 | `agent.decision.environment_state` | No       | Snapshot of relevant environment state at decision time.          |
@@ -329,7 +329,7 @@ Link an agent action to the environment change it caused.
 │  action.shell   │ ────────────────────────▶│ environment.    │
 │    .execute     │                          │  state_change   │
 └─────────────────┘                          └─────────────────┘
-     agent.id: explorer                         target.node: web-01
+     agent.name: explorer                       target.node: web-01
      action.input: "curl..."                      outcome.type: discovery
 ```
 
@@ -344,7 +344,7 @@ Link an agent action to telemetry it generated in the environment.
 │  action.tool    │ ────────────────────────▶│ environment.    │
 │    .nmap        │                          │   node_event    │
 └─────────────────┘                          └─────────────────┘
-     agent.id: explorer                         source: syslog
+     agent.name: explorer                       source: syslog
      target.address: 10.0.1.0/24                  event: connection_attempt
 ```
 
@@ -360,7 +360,7 @@ Link actions across communicating agents.
 │  communication  │                          │  communication  │
 │  (send)         │                          │  (receive)      │
 └─────────────────┘                          └─────────────────┘
-     agent.id: explorer                         agent.id: analyzer
+     agent.name: explorer                       agent.name: analyzer
      channel: findings                            channel: findings
 ```
 
@@ -389,7 +389,7 @@ span:
   trace_id: abc123
   span_id: def456
   attributes:
-    agent.id: explorer
+    agent.name: explorer
     action.name: nmap_scan
     action_id: scan-001
 
@@ -412,7 +412,7 @@ event:
   class: action.completed
   correlation_id: corr-789
   attributes:
-    agent.id: explorer
+    agent.name: explorer
     action.name: enumerate_hosts
 
 # Environment effect
@@ -582,7 +582,7 @@ applicable. Use the `otel.*` prefix for OTel-specific attributes.
 
 | ACES Attribute       | OTel Equivalent         |
 | :------------------- | :---------------------- |
-| `agent.id`         | `service.name`          |
+| `agent.name`       | `service.name`          |
 | `action.duration_ms` | `duration` (span field) |
 | `target.address`     | `net.peer.name`         |
 | `target.port`        | `net.peer.port`         |
@@ -603,7 +603,7 @@ Attributes can be mapped to ECS fields.
 
 | ACES Attribute        | ECS Equivalent     |
 | :-------------------- | :----------------- |
-| `agent.id`          | `agent.name`       |
+| `agent.name`        | `agent.name`       |
 | `target.address`      | `destination.ip`   |
 | `target.port`         | `destination.port` |
 | `credential.username` | `user.name`        |
@@ -657,7 +657,7 @@ span:
     environment.name: ad-lab
 
     # Agent attributes
-    agent.id: recon-agent
+    agent.name: recon-agent
     agent.type: llm
     agent.instance_id: recon-agent-7f8a9b
 
