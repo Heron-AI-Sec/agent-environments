@@ -51,14 +51,15 @@ Core attributes appear across all telemetry types (spans, logs, metrics).
 
 Identify the source of telemetry.
 
-| Attribute             | Type   | Description               | Example                           |
-| :-------------------- | :----- | :------------------------ | :-------------------------------- |
-| `experiment.name`     | String | Experiment identifier     | `exploration-001`                 |
-| `experiment.version`  | String | Experiment version        | `1.0.0`                           |
-| `experiment.agents`   | Object | Active agents             | `[explorer-agent, network-agent]` |
-| `experiment.phase`    | String | Current execution phase   | `exploration`                     |
-| `environment.name`    | String | RFC-0001 environment name | `dev-environment`                 |
-| `environment.version` | String | Environment version       | `1.0.0`                           |
+| Attribute              | Type   | Description                      | Example                           |
+| :--------------------- | :----- | :------------------------------- | :-------------------------------- |
+| `experiment.name`      | String | Experiment identifier            | `exploration-001`                 |
+| `experiment.version`   | String | Experiment version               | `1.0.0`                           |
+| `experiment.agents`    | Object | Active agents                    | `[explorer-agent, network-agent]` |
+| `experiment.phase`     | String | Current execution phase          | `exploration`                     |
+| `experiment.resources` | Array  | External resources for agents    | `[guide-1.md, kb-security.json]`  |
+| `environment.name`     | String | RFC-0001 environment name        | `dev-environment`                 |
+| `environment.version`  | String | Environment version              | `1.0.0`                           |
 
 ### Agent Attributes
 
