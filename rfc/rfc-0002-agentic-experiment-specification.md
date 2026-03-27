@@ -280,15 +280,28 @@ What the agent can do.
 | `api`      | API calls                    | `allowed`, `scopes` |
 | `protocol` | Network protocol interaction | `allowed`           |
 
+> **Note:** This list is illustrative, not exhaustive. `CapabilityType` is a `growing` tier type, so new values (e.g., `mcp`, `skill`) are expected and accepted without the `x-` prefix.
+
 ### Context
 
 Where the agent operates within the RFC-0001 environment.
 
-| Property  | Type   | Required | Description                           | Example                  |
-| :-------- | :----- | :------- | :------------------------------------ | :----------------------- |
-| `node`    | String | No       | Starting node (refs topology.nodes).  | `workstation-01`         |
-| `targets` | Array  | No       | Target nodes (refs topology.nodes).   | `[server-01, server-02]` |
-| `groups`  | Array  | No       | Target groups (refs RFC-0001 groups). | `[servers]`              |
+| Property   | Type   | Required | Description                           | Example                  |
+| :--------- | :----- | :------- | :------------------------------------ | :----------------------- |
+| `node`     | String | No       | Starting node (refs topology.nodes).  | `workstation-01`         |
+| `targets`  | Array  | No       | Target nodes (refs topology.nodes).   | `[server-01, server-02]` |
+| `groups`   | Array  | No       | Target groups (refs RFC-0001 groups). | `[servers]`              |
+| `identity` | Object | No       | Starting identity and privileges.     | See Identity             |
+
+#### Identity
+
+The agent's starting identity and privilege level within the environment.
+
+| Property          | Type   | Required | Description                    | Example                                   |
+| :---------------- | :----- | :------- | :----------------------------- | :---------------------------------------- |
+| `user`            | String | No       | Active system user.            | `jsmith`                                  |
+| `privilege_level` | String | No       | Privilege tier.                | `local_user`, `domain_user`, `domain_admin`, `system` |
+| `groups`          | Array  | No       | Security groups the user is in.| `[developers, remote-users]`              |
 
 ### Resources
 
@@ -356,6 +369,9 @@ agents:
     context:
       node: attacker-01
       groups: [servers]
+      identity:
+        user: operator
+        privilege_level: local_user
     resources:
       cpu: "500m"
       memory: "1Gi"
