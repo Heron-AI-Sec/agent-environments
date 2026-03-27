@@ -297,7 +297,7 @@ agent.decision.*     (one reasoning cycle — what the agent decided to do)
 | `agent.decision.objective_ref`     | Yes      | RFC-0002 objective the agent was pursuing.                        |
 | `agent.decision.environment_state` | No       | Snapshot of relevant environment state at decision time.          |
 | `agent.decision.input`             | Yes      | What the agent observed before deciding.                          |
-| `agent.decision.cot`               | Yes      | Chain-of-Thought reasoning steps. **How to gather this?**         |
+| `agent.decision.cot`               | Yes      | Chain-of-Thought reasoning steps extracted from agent output.     |
 | `agent.decision.outcome`           | No       | Result of the decision cycle: `success`, `failure`, `aborted`.   |
 
 ---
