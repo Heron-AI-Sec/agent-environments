@@ -1382,9 +1382,8 @@ Rejected: Separating them enables environment reuse across experiments.
 |:--------------------------------------|:---------------------------------------|
 | RFC-0002: Experiment Specification    | Defines what happens in environments: scenario roles, objectives, agent coordination |
 | RFC-0003: Observability Schema        | Defines telemetry semantics and attributes |
-| RFC-0004: Security Domain Schema      | Attack relationship types, credential kinds, blue team roles for security scenarios |
-| [Defensive Control Evaluation Metadata Appendix](./rfc-defense-appendix-draft-0.1.md) | ACES-specific evaluation metadata layered on top of OCSF-compatible defensive telemetry, findings, and evidence artifacts |
-| RFC-0005: Agent SDK (future)          | Agent implementation interfaces        |
+| RFC-0004: Scenario Definition | Descriptive metadata about the experiment |
+| RFC-0005: Security Domain Schema | Attack and defense relationships, roles, and telemetry for cybersecurity scenarios |
 
 ---
 
