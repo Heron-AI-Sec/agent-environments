@@ -35,10 +35,11 @@ Consistent telemetry semantics enable:
 
 | Section       | Purpose                                  |
 | :------------ | :--------------------------------------- |
-| `attributes`  | Standard attribute definitions and types |
-| `taxonomy`    | Event categories and classes             |
-| `correlation` | Patterns for linking related telemetry   |
-| `extensions`  | Domain-specific schema additions         |
+| `attributes`        | Standard attribute definitions and types          |
+| `taxonomy`          | Event categories and classes                      |
+| `agent_decisions`   | Structured records emitted per agent decision     |
+| `correlation`       | Patterns for linking related telemetry            |
+| `extensions`        | Domain-specific schema additions                  |
 
 ---
 
@@ -65,51 +66,66 @@ Identify the agent producing or triggering telemetry.
 
 | Attribute           | Type   | Description                | Example                      |
 | :------------------ | :----- | :------------------------- | :--------------------------- |
-| `agent.name`        | String | Agent identifier           | `explorer-agent`             |
+| `agent.name`        | String | Agent name — map key from RFC-0002 `agents`. | `explorer-agent`             |
 | `agent.type`        | String | Agent paradigm             | `llm`, `rl`, `scripted`      |
 | `agent.role`        | String | Functional role            | `orchestrator`, `specialist` |
 | `agent.instance_id` | String | Unique instance identifier | `explorer-agent-7f8a9b`      |
 
 ### Action Attributes
 
-Describe agent actions.
+Describe agent actions. An action is a logical unit of work (e.g. "scan_and_sort_network") that may involve multiple tool calls. Each tool call within an action produces a child span using `action.tool_call.*` attributes.
 
-| Attribute            | Type    | Description                        | Example                         |
-| :------------------- | :------ | :--------------------------------- | :------------------------------ |
-| `action.name`        | String  | Action identifier                  | `shell.execute`                 |
-| `action.type`        | String  | Action category                    | `shell`, `tool`, `api`          |
-| `action.role`        | String  | Role for the action                | `root`, `user`                  |
-| `action.input`       | String  | Action input (may be truncated)    | `nmap -sV 10.0.1.0/24`          |
-| `action.output`      | String  | Action output (may be truncated)   | `Host 10.0.1.10 is up...`       |
-| `action.status`      | String  | Outcome status                     | `success`, `failure`, `timeout` |
-| `action.duration_ms` | Integer | Execution duration in milliseconds | `1523`                          |
-| `action.iteration`   | Integer | Action sequence number for agent   | `42`                            |
+| Attribute            | Type    | Description                                                       | Example                              |
+| :------------------- | :------ | :---------------------------------------------------------------- | :----------------------------------- |
+| `action.id`          | String  | Unique action identifier. Used for correlation (see `action_id`). | `action-7f3a1c`                      |
+| `action.name`        | String  | Human-readable action label.                                      | `scan_and_sort_network`              |
+| `action.type`        | String  | Action category.                                                  | `shell`, `tool`, `api`               |
+| `action.role`        | String  | Role for the action.                                              | `root`, `user`                       |
+| `action.input`       | String  | Action input (may be truncated).                                  | `nmap -sV 10.0.1.0/24`               |
+| `action.output`      | String  | Action output (may be truncated).                                 | `Host 10.0.1.10 is up...`            |
+| `action.status`      | String  | Outcome status.                                                   | `success`, `failure`, `timeout`      |
+| `action.duration_ms` | Integer | Execution duration in milliseconds.                               | `1523`                               |
+| `action.iteration`   | Integer | Action sequence number for agent.                                 | `42`                                 |
+
+#### Action Tool Call Attributes
+
+Each tool invocation within an action produces a child span with these attributes.
+
+| Attribute                    | Required | Description                                     |
+| :--------------------------- | :------- | :---------------------------------------------- |
+| `action.tool_call.id`        | Yes      | Unique identifier for this tool execution.      |
+| `action.tool_call.name`      | Yes      | Tool or command invoked.                        |
+| `action.tool_call.arguments` | Yes      | Parameters passed to the tool.                  |
+| `action.tool_call.timestamp` | Yes      | When execution started (ISO 8601).              |
+| `action.tool_call.duration_ms` | No     | How long the tool took to execute.              |
+| `action.tool_call.output`    | Yes      | Raw output returned by the tool.                |
+| `action.tool_call.status`    | Yes      | Execution state: `success`, `error`, `timeout`. |
 
 ### Target Attributes
 
 Describe what an action targeted.
 
-| Attribute        | Type    | Description                  | Example                           |
-| :--------------- | :------ | :--------------------------- | :-------------------------------- |
-| `target.node`    | String  | Target node name (RFC-0001)  | `web-01`                          |
-| `target.group`   | String  | Target group name (RFC-0001) | `servers`                         |
-| `target.network` | String  | Target network (RFC-0001)    | `internal`                        |
-| `target.address` | String  | Target IP or hostname        | `10.0.1.10`                       |
-| `target.port`    | Integer | Target port                  | `443`                             |
-| `target.service` | String  | Target service               | `https`                           |
-| `target.env`     | Object  | Environment variables        | `{PATH: /usr/local/sbin:/usr/bin}` |
+| Attribute        | Type    | Description                                                      | Example                            |
+| :--------------- | :------ | :--------------------------------------------------------------- | :--------------------------------- |
+| `target.node`    | String  | Target node identifier — map key from RFC-0001 `topology.nodes`. | `web-01`                           |
+| `target.group`   | String  | Target group identifier — map key from RFC-0001 `groups`.        | `servers`                          |
+| `target.network` | String  | Target network (RFC-0001).                                       | `internal`                         |
+| `target.address` | String  | Target IP or hostname.                                           | `10.0.1.10`                        |
+| `target.port`    | Integer | Target port.                                                     | `443`                              |
+| `target.service` | String  | Target service.                                                  | `https`                            |
+| `target.env`     | Object  | Environment variables.                                           | `{PATH: /usr/local/sbin:/usr/bin}` |
 
 ### Context Attributes
 
 Describe the agent's execution context at the time of an action.
 
-| Attribute                | Type    | Description                             | Example                      |
-| :----------------------- | :------ | :-------------------------------------- | :--------------------------- |
-| `context.node`           | String  | Current node (refs RFC-0001 topology)   | `workstation-01`             |
-| `context.active_networks`| Array   | Networks the agent can currently access | `[corp-lan, domain-subnet]`  |
-| `context.user`           | String  | Active system user                      | `jsmith`                     |
-| `context.is_root`        | Boolean | Whether agent has root/admin privileges | `true`                       |
-| `context.cwd`            | String  | Current working directory               | `/home/jsmith/tools`         |
+| Attribute                 | Type    | Description                             | Example                     |
+| :------------------------ | :------ | :-------------------------------------- | :-------------------------- |
+| `context.node`            | String  | Current node (refs RFC-0001 topology)   | `workstation-01`            |
+| `context.active_networks` | Array   | Networks the agent can currently access | `[corp-lan, domain-subnet]` |
+| `context.user`            | String  | Active system user                      | `jsmith`                    |
+| `context.is_root`         | Boolean | Whether agent has root/admin privileges | `true`                      |
+| `context.cwd`             | String  | Current working directory               | `/home/jsmith/tools`        |
 
 ### Outcome Attributes
 
@@ -235,14 +251,15 @@ All spans SHOULD include:
 | Attribute          | Required | Description                 |
 | :----------------- | :------- | :-------------------------- |
 | `experiment.name`  | Yes      | Experiment identifier       |
-| `agent.name`       | Yes      | Agent that created the span |
+| `agent.name`     | Yes      | Agent that created the span |
 | `experiment.phase` | Yes      | Current phase               |
 
 Action spans SHOULD also include:
 
 | Attribute       | Required | Description                     |
 | :-------------- | :------- | :------------------------------ |
-| `action.name`   | Yes      | Action identifier               |
+| `action.id`     | Yes      | Unique action identifier        |
+| `action.name`   | No       | Human-readable action label     |
 | `action.type`   | Yes      | Action category                 |
 | `action.status` | Yes      | Outcome status                  |
 | `target.*`      | No       | Target attributes if applicable |
@@ -254,6 +271,34 @@ Action spans SHOULD also include:
 | `child_of`     | Span is a child of parent span           |
 | `follows_from` | Span is causally related but not a child |
 | `links`        | Span references related spans            |
+
+---
+
+## Agent Decision Records
+
+Agent telemetry is structured in three levels. Each level produces its own span:
+
+```text
+agent.decision.*     (one reasoning cycle — what the agent decided to do)
+  └── action.*       (one logical action — e.g. "scan_and_sort_network")
+        └── action.tool_call.*  (one tool invocation — e.g. nmap)
+        └── action.tool_call.*  (one tool invocation — e.g. sort)
+```
+
+`agent.decision.*` captures the reasoning cycle. `action.*` captures the logical action the decision triggered. `action.tool_call.*` captures each atomic tool invocation within that action.
+
+### Agent Decision Attributes
+
+| Attribute                          | Required | Description                                                       |
+| :--------------------------------- | :------- | :---------------------------------------------------------------- |
+| `agent.decision.id`                | Yes      | Unique identifier for this decision record.                       |
+| `agent.decision.agent`             | Yes      | Agent that made this decision. References `agent.name` (RFC-0002). |
+| `agent.decision.timestamp`         | Yes      | When the decision was made (ISO 8601).                            |
+| `agent.decision.objective_ref`     | Yes      | RFC-0002 objective the agent was pursuing.                        |
+| `agent.decision.environment_state` | No       | Snapshot of relevant environment state at decision time.          |
+| `agent.decision.input`             | Yes      | What the agent observed before deciding.                          |
+| `agent.decision.cot`               | Yes      | Chain-of-Thought reasoning steps. **How to gather this?**         |
+| `agent.decision.outcome`           | No       | Result of the decision cycle: `success`, `failure`, `aborted`.   |
 
 ---
 
@@ -284,7 +329,7 @@ Link an agent action to the environment change it caused.
 │  action.shell   │ ────────────────────────▶│ environment.    │
 │    .execute     │                          │  state_change   │
 └─────────────────┘                          └─────────────────┘
-     agent.name: explorer                         target.node: web-01
+     agent.name: explorer                       target.node: web-01
      action.input: "curl..."                      outcome.type: discovery
 ```
 
@@ -299,7 +344,7 @@ Link an agent action to telemetry it generated in the environment.
 │  action.tool    │ ────────────────────────▶│ environment.    │
 │    .nmap        │                          │   node_event    │
 └─────────────────┘                          └─────────────────┘
-     agent.name: explorer                         source: syslog
+     agent.name: explorer                       source: syslog
      target.address: 10.0.1.0/24                  event: connection_attempt
 ```
 
@@ -315,7 +360,7 @@ Link actions across communicating agents.
 │  communication  │                          │  communication  │
 │  (send)         │                          │  (receive)      │
 └─────────────────┘                          └─────────────────┘
-     agent.name: explorer                         agent.name: analyzer
+     agent.name: explorer                       agent.name: analyzer
      channel: findings                            channel: findings
 ```
 
@@ -537,7 +582,7 @@ applicable. Use the `otel.*` prefix for OTel-specific attributes.
 
 | ACES Attribute       | OTel Equivalent         |
 | :------------------- | :---------------------- |
-| `agent.name`         | `service.name`          |
+| `agent.name`       | `service.name`          |
 | `action.duration_ms` | `duration` (span field) |
 | `target.address`     | `net.peer.name`         |
 | `target.port`        | `net.peer.port`         |
@@ -558,7 +603,7 @@ Attributes can be mapped to ECS fields.
 
 | ACES Attribute        | ECS Equivalent     |
 | :-------------------- | :----------------- |
-| `agent.name`          | `agent.name`       |
+| `agent.name`        | `agent.name`       |
 | `target.address`      | `destination.ip`   |
 | `target.port`         | `destination.port` |
 | `credential.username` | `user.name`        |
