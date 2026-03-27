@@ -97,7 +97,19 @@ Describe what an action targeted.
 | `target.address` | String  | Target IP or hostname        | `10.0.1.10`                       |
 | `target.port`    | Integer | Target port                  | `443`                             |
 | `target.service` | String  | Target service               | `https`                           |
-| `target.env`     | String  | Environment variables        | `{PATH:/usr/local/sbin:/usr/bin}` |
+| `target.env`     | Object  | Environment variables        | `{PATH: /usr/local/sbin:/usr/bin}` |
+
+### Context Attributes
+
+Describe the agent's execution context at the time of an action.
+
+| Attribute                | Type    | Description                             | Example                      |
+| :----------------------- | :------ | :-------------------------------------- | :--------------------------- |
+| `context.node`           | String  | Current node (refs RFC-0001 topology)   | `workstation-01`             |
+| `context.active_networks`| Array   | Networks the agent can currently access | `[corp-lan, domain-subnet]`  |
+| `context.user`           | String  | Active system user                      | `jsmith`                     |
+| `context.is_root`        | Boolean | Whether agent has root/admin privileges | `true`                       |
+| `context.cwd`            | String  | Current working directory               | `/home/jsmith/tools`         |
 
 ### Outcome Attributes
 

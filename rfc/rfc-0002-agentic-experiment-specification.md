@@ -32,15 +32,51 @@ A standardized experiment specification enables:
 
 ---
 
+## Type Definitions
+
+Fields across this schema are categorized by stability tier, which determines how strictly they are validated and how extensions are handled.
+
+| Tier              | Description                                                                                              | Validation       |
+| :---------------- | :------------------------------------------------------------------------------------------------------- | :--------------- |
+| `extensible-enum` | Closed list of known values. New values allowed via `x-` prefix convention (e.g. `x-my-custom-value`).   | Pattern-enforced |
+| `growing`         | Open list. Known values are documented but new values are expected and accepted without the `x-` prefix. | Documented only  |
+
+### Shared Types
+
+| Type                   | Kind            | Values                                                                      |
+| :--------------------- | :-------------- | :-------------------------------------------------------------------------- |
+| `AgentType`            | growing         | `llm`, `rl`, `scripted`, `hybrid`, `human`                                  |
+| `ScoringMode`          | extensible-enum | `cumulative`, `time_weighted`, `competitive`, `threshold`                   |
+| `RestartPolicy`        | extensible-enum | `never`, `on_failure`                                                       |
+| `CommunicationPattern` | extensible-enum | `streaming`, `batch`, `direct`, `blackboard`                                |
+| `ConditionType`        | growing         | `state`, `event`, `metric`, `artifact`, `agent_status`, `elapsed`, `custom` |
+| `InjectType`           | growing         | `event`, `state`, `message`, `artifact`, `delay`                            |
+| `CapabilityType`       | growing         | `shell`, `tool`, `api`, `protocol`                                          |
+| `SourceType`           | growing         | `telemetry`, `local`, `api`                                                 |
+| `ModelProvider`        | growing         | `anthropic`, `openai`, `deepseek`, `xai`, `google`, `mistral`               |
+| `TrustLevel`           | extensible-enum | `trusted`, `untrusted`, `sandboxed`                                         |
+| `LogicalOperator`      | extensible-enum | `all`, `any`, `none`, `one`                                                 |
+
+**`LogicalOperator` semantics:**
+
+| Value  | Meaning                   | Evaluates to `true` when                       |
+| :----- | :------------------------ | :--------------------------------------------- |
+| `all`  | Every condition must pass | All conditions in `conditions` are true        |
+| `any`  | At least one must pass    | At least one condition in `conditions` is true |
+| `none` | No condition must pass    | Every condition in `conditions` is false       |
+| `one`  | Exactly one must pass     | Exactly one condition in `conditions` is true  |
+
+---
+
 ## Schema Overview
 
-| Section       | Purpose                                            |
-| :------------ | :------------------------------------------------- |
-| `environment` | Reference to RFC-0001 infrastructure               |
-| `agents`      | Autonomous entities that interact with environment |
-| `objectives`  | Success criteria and scoring                       |
-| `injects`     | Scripted events injected during execution          |
-| `runtime`     | Execution configuration: phases, throttling, state |
+| Section       | Purpose                                                               |
+| :------------ | :-------------------------------------------------------------------- |
+| `environment` | Reference to RFC-0001 infrastructure                                  |
+| `agents`      | Autonomous entities that interact with environment and other entities |
+| `objectives`  | Success criteria and scoring                                          |
+| `injects`     | Scripted events injected during execution                             |
+| `runtime`     | Execution configuration: phases, throttling, state                    |
 
 ---
 
@@ -103,10 +139,11 @@ References an RFC-0001 environment that the experiment executes against.
 
 ### Environment Reference
 
-| Property  | Type   | Required | Description                       | Example          |
-| :-------- | :----- | :------- | :-------------------------------- | :--------------- |
-| `name`    | String | Yes      | Environment name (from metadata). | `ad-range`       |
-| `version` | String | No       | Version constraint.               | `1.0.0`, `>=1.0` |
+| Property       | Type   | Required | Description                                         | Example           |
+| :------------- | :----- | :------- | :-------------------------------------------------- | :---------------- |
+| `name`         | String | Yes      | Environment name (unique identifier from metadata). | `ad-range`        |
+| `version`      | String | No       | Version constraint.                                 | `1.0.0`, `>=1.0`  |
+| `display_name` | String | No       | Human-readable label                                | `AD Attack Range` |
 
 ### Integration with RFC-0001
 
@@ -140,20 +177,21 @@ goals. They execute on the `agent_platform` defined in RFC-0001.
 
 Agents are defined as a map keyed by name (the unique identifier).
 
-| Property        | Type   | Required | Description                         | Example                                    |
-| :-------------- | :----- | :------- | :---------------------------------- | :----------------------------------------- |
-| `display_name`  | String | No       | Human-readable label.               | `Research Agent`                           |
-| `type`          | String | Yes      | Agent paradigm.                     | `llm`, `rl`, `scripted`, `hybrid`, `human` |
-| `goal`          | String | Yes      | Natural language objective.         | `Analyze and report findings`              |
-| `model`         | Object | No       | LLM configuration (for llm/hybrid). | See Model                                  |
-| `observation`   | Object | No       | What the agent can perceive.        | See Observation                            |
-| `actions`       | Object | No       | What the agent can do.              | See Actions                                |
-| `context`       | Object | No       | Starting position and targets.      | See Context                                |
-| `resources`     | Object | No       | Compute requirements.               | See Resources                              |
-| `depends_on`    | Array  | No       | Agents that must complete first.    | `[setup-agent]`                            |
-| `communication` | Object | No       | Inter-agent communication.          | See Communication                          |
-| `lifecycle`     | Object | No       | Spawn/termination conditions.       | See Lifecycle                              |
-| `labels`        | Object | No       | Arbitrary key-value labels.         | `{team: red, role: recon}`                 |
+| Property        | Type       | Required | Description                         | Example                                   |
+| :-------------- | :--------- | :------- | :---------------------------------- | :---------------------------------------- |
+| `display_name`  | String     | No       | Human-readable label.               | `Research Agent`                          |
+| `type`          | AgentType  | Yes      | Agent paradigm.                     | see [Type Definitions](#type-definitions) |
+| `goal`          | String     | Yes      | Natural language objective.         | `Analyze and report findings`             |
+| `model`         | Object     | No       | LLM configuration (for llm/hybrid). | See Model                                 |
+| `observation`   | Object     | No       | What the agent can perceive.        | See Observation                           |
+| `actions`       | Object     | No       | What the agent can do.              | See Actions                               |
+| `context`       | Object     | No       | Starting position and targets.      | See Context                               |
+| `resources`     | Object     | No       | Compute requirements.               | See Resources                             |
+| `depends_on`    | Array      | No       | Agents that must complete first.    | `[setup-agent.lifecycle.goal_reached]`    |
+| `communication` | Object     | No       | Inter-agent communication.          | See Communication                         |
+| `lifecycle`     | Object     | No       | Spawn/termination conditions.       | See Lifecycle                             |
+| `trust_level`   | TrustLevel | No       | Trust level of the agent            | see [Type Definitions](#type-definitions) |
+| `labels`        | Object     | No       | Arbitrary key-value labels.         | `{team: red, role: recon}`                |
 
 ### Agent Types
 
@@ -169,22 +207,22 @@ Agents are defined as a map keyed by name (the unique identifier).
 
 LLM configuration for `llm` and `hybrid` agents.
 
-| Property      | Type    | Required | Description              | Example                    |
-| :------------ | :------ | :------- | :----------------------- | :------------------------- |
-| `provider`    | String  | No       | Model provider.          | `anthropic`, `openai`      |
-| `name`        | String  | No       | Model identifier.        | `claude-sonnet-4-20250514` |
-| `temperature` | Float   | No       | Sampling temperature.    | `0.7`                      |
-| `max_tokens`  | Integer | No       | Maximum response tokens. | `4096`                     |
+| Property     | Type          | Required | Description                   | Example                                   |
+| :----------- | :------------ | :------- | :---------------------------- | :---------------------------------------- |
+| `provider`   | ModelProvider | No       | Model provider.               | see [Type Definitions](#type-definitions) |
+| `name`       | String        | No       | Model identifier.             | `claude-sonnet-4-20250514`                |
+| `parameters` | Object        | No       | Key-value store of parameters | `{temperature: 0.7, top_p: 0.95}`         |
+| `max_tokens` | Integer       | No       | Maximum response tokens.      | `4096`                                    |
 
 ### Observation
 
 What the agent can perceive. Sources reference RFC-0001 telemetry or local
 agent feedback. Event formats and attributes follow RFC-0003 schema conventions.
 
-| Property  | Type   | Required | Description                      | Example                    |
-| :-------- | :----- | :------- | :------------------------------- | :------------------------- |
-| `sources` | Array  | No       | Data sources available to agent. | See Source Types           |
-| `schema`  | Object | No       | RFC-0003 schema reference.       | `{extensions: [security]}` |
+| Property  | Type            | Required | Description                      | Example                    |
+| :-------- | :-------------- | :------- | :------------------------------- | :------------------------- |
+| `sources` | Array\<Source\> | No       | Data sources available to agent. | See Source Types           |
+| `schema`  | Object          | No       | RFC-0003 schema reference.       | `{extensions: [security]}` |
 
 #### Source Types
 
@@ -196,13 +234,13 @@ agent feedback. Event formats and attributes follow RFC-0003 schema conventions.
 
 #### Source Object
 
-| Property    | Type   | Required | Description                         | Example                     |
-| :---------- | :----- | :------- | :---------------------------------- | :-------------------------- |
-| `type`      | String | Yes      | Source type.                        | `telemetry`, `local`, `api` |
-| `ref`       | String | No       | RFC-0001 reference (for telemetry). | `telemetry.sinks.loki`      |
-| `filter`    | Object | No       | Filter criteria.                    | `{severity: critical}`      |
-| `channels`  | Array  | No       | Local channels.                     | `[stdout, stderr]`          |
-| `endpoints` | Array  | No       | API endpoints.                      | `[query_status, list]`      |
+| Property    | Type       | Required | Description                         | Example                                   |
+| :---------- | :--------- | :------- | :---------------------------------- | :---------------------------------------- |
+| `type`      | SourceType | Yes      | Source type.                        | see [Type Definitions](#type-definitions) |
+| `ref`       | String     | No       | RFC-0001 reference (for telemetry). | `telemetry.sinks.loki`                    |
+| `filter`    | Object     | No       | Filter criteria.                    | `{severity: critical}`                    |
+| `channels`  | Array      | No       | Local channels.                     | `[stdout, stderr]`                        |
+| `endpoints` | Array      | No       | API endpoints.                      | `[query_status, list]`                    |
 
 ### Actions
 
@@ -223,12 +261,12 @@ What the agent can do.
 
 #### Capability Object
 
-| Property  | Type   | Required | Description        | Example                  |
-| :-------- | :----- | :------- | :----------------- | :----------------------- |
-| `type`    | String | Yes      | Capability type.   | `shell`, `tool`, `api`   |
-| `allowed` | Array  | No       | Allowed values.    | `[bash]`, `[nmap, curl]` |
-| `denied`  | Array  | No       | Denied values.     | `[rm -rf /]`             |
-| `scopes`  | Array  | No       | Permission scopes. | `[read, write]`          |
+| Property  | Type           | Required | Description        | Example                                   |
+| :-------- | :------------- | :------- | :----------------- | :---------------------------------------- |
+| `type`    | CapabilityType | Yes      | Capability type.   | see [Type Definitions](#type-definitions) |
+| `allowed` | Array          | No       | Allowed values.    | `[bash]`, `[nmap, curl]`                  |
+| `denied`  | Array          | No       | Denied values.     | `[rm -rf /]`                              |
+| `scopes`  | Array          | No       | Permission scopes. | `[read, write]`                           |
 
 ### Context
 
@@ -239,27 +277,6 @@ Where the agent operates within the RFC-0001 environment.
 | `node`    | String | No       | Starting node (refs topology.nodes).  | `workstation-01`         |
 | `targets` | Array  | No       | Target nodes (refs topology.nodes).   | `[server-01, server-02]` |
 | `groups`  | Array  | No       | Target groups (refs RFC-0001 groups). | `[servers]`              |
-
-### State
-
-The current state of the agent within the RFC-0001 environment.
-
-| Property          | Type   | Required | Description                                     | Example                      |
-| :---------------- | :----- | :------- | :---------------------------------------------- | :--------------------------- |
-| `node`            | String | No       | Current node (refs topology.nodes).             | `workstation-01`             |
-| `active_networks` | Array  | Yes      | The logical networks the agent can access.      | `[range-vpc, domain-subnet]` |
-| `node_state`      | Object | Yes      | Ephemeral state at the exact time of execution. | See NodeState Object         |
-
-### NodeState Object
-
-This object captures the localized, ephemeral operating system context.
-
-| Field      | Type    | Required | Description                    | Example                                |
-| :--------- | :------ | :------- | :----------------------------- | :------------------------------------- |
-| `user`     | String  | Yes      | The active system user.        | `root`                                 |
-| `is_root`  | Boolean | Yes      | Flag for root privileges.      | `true`                                 |
-| `cwd`      | String  | Yes      | The Current Working Directory. | `/etc/cron.d`                          |
-| `env_vars` | Object  | No       | Key environment variables.     | `{"PATH": "/usr/local/sbin:/usr/bin"}` |
 
 ### Resources
 
@@ -277,22 +294,22 @@ Compute resources for agent execution on RFC-0001 `agent_platform`.
 Inter-agent communication. Uses RFC-0001 `agent_platform.orchestrator` and
 `agent_platform.storage`.
 
-| Property      | Type   | Required | Description             | Example                                      |
-| :------------ | :----- | :------- | :---------------------- | :------------------------------------------- |
-| `pattern`     | String | No       | Communication pattern.  | `streaming`, `batch`, `direct`, `blackboard` |
-| `channels`    | Array  | No       | Named pub/sub channels. | `[findings, requests]`                       |
-| `rpc_service` | String | No       | RPC service name.       | `coordinator`                                |
+| Property      | Type                 | Required | Description             | Example                                   |
+| :------------ | :------------------- | :------- | :---------------------- | :---------------------------------------- |
+| `pattern`     | CommunicationPattern | No       | Communication pattern.  | see [Type Definitions](#type-definitions) |
+| `channels`    | Array                | No       | Named pub/sub channels. | `[findings, requests]`                    |
+| `rpc_service` | String               | No       | RPC service name.       | `coordinator`                             |
 
 ### Lifecycle
 
 Agent spawn and termination conditions.
 
-| Property         | Type    | Required | Description                      | Example               |
-| :--------------- | :------ | :------- | :------------------------------- | :-------------------- |
-| `max_iterations` | Integer | No       | Maximum action iterations.       | `1000`                |
-| `timeout`        | String  | No       | Maximum runtime.                 | `1h`                  |
-| `terminate_on`   | String  | No       | Objective that terminates agent. | `goal-reached`        |
-| `restart_policy` | String  | No       | Behavior on failure.             | `never`, `on_failure` |
+| Property         | Type          | Required | Description                      | Example                                   |
+| :--------------- | :------------ | :------- | :------------------------------- | :---------------------------------------- |
+| `max_iterations` | Integer       | No       | Maximum action iterations.       | `1000`                                    |
+| `timeout`        | String        | No       | Maximum runtime.                 | `1h`                                      |
+| `terminate_on`   | String        | No       | Objective that terminates agent. | `goal-reached`                            |
+| `restart_policy` | RestartPolicy | No       | Behavior on failure.             | see [Type Definitions](#type-definitions) |
 
 ### Agents Example
 
@@ -308,6 +325,9 @@ agents:
     model:
       provider: anthropic
       name: claude-sonnet-4-20250514
+      parameters:
+        temperature: 0.7
+        top_p: 0.95
     observation:
       sources:
         - type: local
@@ -376,11 +396,11 @@ Objectives are defined as a map keyed by name (the unique identifier).
 
 Conditions define when an objective is achieved.
 
-| Property | Type    | Required | Description           | Example             |
-| :------- | :------ | :------- | :-------------------- | :------------------ |
-| `type`   | String  | Yes      | Condition type.       | See Condition Types |
-| `negate` | Boolean | No       | Invert the condition. | `true`              |
-| ...      | ...     | ...      | Type-specific fields. | See below           |
+| Property | Type          | Required | Description           | Example                                   |
+| :------- | :------------ | :------- | :-------------------- | :---------------------------------------- |
+| `type`   | ConditionType | Yes      | Condition type.       | see [Type Definitions](#type-definitions) |
+| `negate` | Boolean       | No       | Invert the condition. | `true`                                    |
+| ...      | ...           | ...      | Type-specific fields. | See below                                 |
 
 #### Condition Types
 
@@ -424,11 +444,12 @@ condition:
 
 #### Compound Conditions
 
-Use `all` (AND) or `any` (OR) for compound logic:
+Set `logical` to a `LogicalOperator` value to combine multiple conditions. See [Type Definitions](#type-definitions) for the full set and semantics.
 
 ```yaml
 condition:
-  all:
+  logical: all
+  conditions:
     - type: state
       expr: "task.completed == true"
     - type: metric
@@ -437,7 +458,8 @@ condition:
       value: 0.9
 
 condition:
-  any:
+  logical: any
+  conditions:
     - type: event
       event_type: goal_a
     - type: event
@@ -488,24 +510,40 @@ stimuli, simulate external events, or set up specific conditions.
 
 Injects are defined as a map keyed by name (the unique identifier).
 
-| Property       | Type   | Required | Description            | Example                |
-| :------------- | :----- | :------- | :--------------------- | :--------------------- |
-| `display_name` | String | No       | Human-readable label.  | `External Trigger`     |
-| `description`  | String | No       | Detailed description.  | `Simulates...`         |
-| `type`         | String | Yes      | Inject type.           | See Inject Types       |
-| `target`       | String | No       | Target node or agent.  | `server-01`, `agent-1` |
-| `payload`      | Object | Yes      | Type-specific payload. | See below              |
-| `timing`       | Object | No       | When to execute.       | See Timing             |
+| Property       | Type       | Required | Description            | Example                                   |
+| :------------- | :--------- | :------- | :--------------------- | :---------------------------------------- |
+| `display_name` | String     | No       | Human-readable label.  | `External Trigger`                        |
+| `description`  | String     | No       | Detailed description.  | `Simulates...`                            |
+| `type`         | InjectType | Yes      | Inject type.           | see [Type Definitions](#type-definitions) |
+| `target`       | String     | No       | Target node or agent.  | `server-01`, `agent-1`                    |
+| `payload`      | Object     | Yes      | Type-specific payload. | See below                                 |
+| `timing`       | Object     | No       | When to execute.       | See Timing                                |
 
 ### Inject Types
 
-| Type       | Description               | Payload Fields       |
-| :--------- | :------------------------ | :------------------- |
-| `event`    | Emit event to telemetry   | `event_type`, `data` |
-| `state`    | Modify environment state  | `target`, `mutation` |
-| `message`  | Send message to agent     | `content`, `channel` |
-| `artifact` | Place file in environment | `path`, `content`    |
-| `delay`    | Pause execution           | `duration`           |
+| Type       | Description                 | Payload Fields        |
+| :--------- | :-------------------------- | :-------------------- |
+| `event`    | Emit event to telemetry     | `event_type`, `data`  |
+| `state`    | Modify environment state    | `target`, `mutation`  |
+| `message`  | Send message to agent       | `content`, `channel`  |
+| `artifact` | Place file in environment   | `path`, `content`     |
+| `delay`    | Pause execution             | `duration`            |
+| `custom`   | Custom inject via evaluator | `evaluator`, `params` |
+
+#### Custom Injects
+
+For inject types not covered above, use `type: custom` with an evaluator:
+
+```yaml
+injects:
+  run-custom-script:
+    type: custom
+    payload:
+      evaluator: my_custom_inject
+      params:
+        command: "bash /tmp/setup.sh"
+        target: server-01
+```
 
 ### Timing
 
@@ -515,6 +553,8 @@ Injects are defined as a map keyed by name (the unique identifier).
 | `delay`  | String | No       | Delay after trigger.           | `30s`         |
 | `at`     | String | No       | Absolute time into experiment. | `10m`         |
 | `after`  | String | No       | Execute after another inject.  | `inject-1`    |
+
+> **Note:** `at` is relative to experiment start time. Use `on_enter`/`on_exit` on phases when you need an inject tied to a phase transition rather than an absolute time. For example, `timing.at: 0m` fires at the start of the experiment, while `on_enter` fires when that specific phase begins, which may be well into the experiment.
 
 ### Injects Example
 
@@ -602,11 +642,11 @@ Phases are defined as a map keyed by name (the unique identifier).
 
 ### Scoring
 
-| Property     | Type    | Required | Description                | Example   |
-| :----------- | :------ | :------- | :------------------------- | :-------- |
-| `mode`       | String  | No       | Scoring mode.              | See Modes |
-| `time_limit` | String  | No       | Scoring time window.       | `2h`      |
-| `normalize`  | Boolean | No       | Normalize scores to 0-100. | `false`   |
+| Property     | Type        | Required | Description                | Example                                   |
+| :----------- | :---------- | :------- | :------------------------- | :---------------------------------------- |
+| `mode`       | ScoringMode | No       | Scoring mode.              | see [Type Definitions](#type-definitions) |
+| `time_limit` | String      | No       | Scoring time window.       | `2h`                                      |
+| `normalize`  | Boolean     | No       | Normalize scores to 0-100. | `false`                                   |
 
 #### Scoring Modes
 
