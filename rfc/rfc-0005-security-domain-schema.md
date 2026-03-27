@@ -1,4 +1,4 @@
-# RFC-0004: Security Domain Schema
+# RFC-0005: Security Domain Schema
 
 ## Status
 
@@ -1774,7 +1774,7 @@ RFC-0001 types to the appropriate verification tier.
 Invalid edge types, malformed references, and type mismatches are caught
 before runtime.
 
-**Tier 2 (Semantic)** validation uses formal methods (ADR-0004) to verify
+**Tier 2 (Semantic)** validation uses formal methods to verify
 logical properties. This includes coverage analysis (do detections cover
 attacks?) and reachability proofs (can the agent reach the goal?).
 
