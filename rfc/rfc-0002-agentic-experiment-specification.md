@@ -250,15 +250,6 @@ What the agent can do.
 | :------------- | :---- | :------- | :---------------------- | :------------------- |
 | `capabilities` | Array | No       | Available action types. | See Capability Types |
 
-#### Capability Types
-
-| Type       | Description                  | Properties          |
-| :--------- | :--------------------------- | :------------------ |
-| `shell`    | Shell command execution      | `allowed`, `denied` |
-| `tool`     | Tool invocation              | `allowed`           |
-| `api`      | API calls                    | `allowed`, `scopes` |
-| `protocol` | Network protocol interaction | `allowed`           |
-
 #### Capability Object
 
 | Property  | Type           | Required | Description        | Example                                   |
@@ -267,6 +258,15 @@ What the agent can do.
 | `allowed` | Array          | No       | Allowed values.    | `[bash]`, `[nmap, curl]`                  |
 | `denied`  | Array          | No       | Denied values.     | `[rm -rf /]`                              |
 | `scopes`  | Array          | No       | Permission scopes. | `[read, write]`                           |
+
+#### Capability Types
+
+| Type       | Description                  | Properties          |
+| :--------- | :--------------------------- | :------------------ |
+| `shell`    | Shell command execution      | `allowed`, `denied` |
+| `tool`     | Tool invocation              | `allowed`           |
+| `api`      | API calls                    | `allowed`, `scopes` |
+| `protocol` | Network protocol interaction | `allowed`           |
 
 ### Context
 
