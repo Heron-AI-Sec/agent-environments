@@ -105,15 +105,27 @@ Each tool invocation within an action produces a child span with these attribute
 
 Describe what an action targeted.
 
-| Attribute        | Type    | Description                                                    | Example                           |
-| :--------------- | :------ | :------------------------------------------------------------- | :-------------------------------- |
-| `target.node`    | String  | Target node identifier — map key from RFC-0001 `topology.nodes`. | `web-01`                        |
-| `target.group`   | String  | Target group identifier — map key from RFC-0001 `groups`.      | `servers`                         |
-| `target.network` | String  | Target network (RFC-0001).                                     | `internal`                        |
-| `target.address` | String  | Target IP or hostname.                                         | `10.0.1.10`                       |
-| `target.port`    | Integer | Target port.                                                   | `443`                             |
-| `target.service` | String  | Target service.                                                | `https`                           |
-| `target.env`     | String  | Environment variables.                                         | `{PATH:/usr/local/sbin:/usr/bin}` |
+| Attribute        | Type    | Description                                                      | Example                            |
+| :--------------- | :------ | :--------------------------------------------------------------- | :--------------------------------- |
+| `target.node`    | String  | Target node identifier — map key from RFC-0001 `topology.nodes`. | `web-01`                           |
+| `target.group`   | String  | Target group identifier — map key from RFC-0001 `groups`.        | `servers`                          |
+| `target.network` | String  | Target network (RFC-0001).                                       | `internal`                         |
+| `target.address` | String  | Target IP or hostname.                                           | `10.0.1.10`                        |
+| `target.port`    | Integer | Target port.                                                     | `443`                              |
+| `target.service` | String  | Target service.                                                  | `https`                            |
+| `target.env`     | Object  | Environment variables.                                           | `{PATH: /usr/local/sbin:/usr/bin}` |
+
+### Context Attributes
+
+Describe the agent's execution context at the time of an action.
+
+| Attribute                 | Type    | Description                             | Example                     |
+| :------------------------ | :------ | :-------------------------------------- | :-------------------------- |
+| `context.node`            | String  | Current node (refs RFC-0001 topology)   | `workstation-01`            |
+| `context.active_networks` | Array   | Networks the agent can currently access | `[corp-lan, domain-subnet]` |
+| `context.user`            | String  | Active system user                      | `jsmith`                    |
+| `context.is_root`         | Boolean | Whether agent has root/admin privileges | `true`                      |
+| `context.cwd`             | String  | Current working directory               | `/home/jsmith/tools`        |
 
 ### Outcome Attributes
 
@@ -266,7 +278,7 @@ Action spans SHOULD also include:
 
 Agent telemetry is structured in three levels. Each level produces its own span:
 
-```
+```text
 agent.decision.*     (one reasoning cycle — what the agent decided to do)
   └── action.*       (one logical action — e.g. "scan_and_sort_network")
         └── action.tool_call.*  (one tool invocation — e.g. nmap)
