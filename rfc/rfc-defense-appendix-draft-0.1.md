@@ -129,7 +129,7 @@ Each evaluation record SHOULD include the following fields:
 | `expected_effect` | `String` | `Expected control behavior for the action.` | `{detect, block, respond, none}` |
 | `detection_observed` | `Boolean` | `Whether observable telemetry or an alert was generated.` | `true` |
 | `blocking_observed` | `Boolean` | `Whether the action was prevented from completing.` | `true` |
-| `final_outcome` | `String` | `Normalized result for this action/control pair.` | `{bypassed, detected, blocked, partially_blocked, not_applicable}` |
+| `final_outcome` | `String` | `Normalized result for this action/control pair.` | `{bypassed, detected, blocked, partially_blocked, error, not_applicable}` |
 | `evidence` | `Array` | `References to OCSF-normalized findings, evidence artifacts, alerts, logs, packet captures, or other artifacts.` | `[finding_uid:waf-detection-44321]` |
 | `notes` | `String` | `Operator notes or implementation-specific context.` | `Alert fired after request body inspection.` |
 
