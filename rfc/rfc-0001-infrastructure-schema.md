@@ -1377,7 +1377,7 @@ Rejected: Separating them enables environment reuse across experiments.
 |:--------------------------------------|:---------------------------------------|
 | RFC-0002: Experiment Specification    | Defines what happens in environments: scenario roles, objectives, agent coordination |
 | RFC-0003: Observability Schema        | Defines telemetry semantics and attributes |
-| RFC-0004: Security Domain Schema      | Attack relationship types, credential kinds, blue team roles for security scenarios |
+| RFC-0004: Security Environment Wrapper | Security environment wrapper, semantics profile bindings, and external authority boundaries for security scenarios |
 | RFC-0005: Agent SDK (future)          | Agent implementation interfaces        |
 
 ---
