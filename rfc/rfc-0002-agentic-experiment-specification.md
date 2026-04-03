@@ -183,9 +183,10 @@ Agents are defined as a map keyed by name (the unique identifier).
 | `type`          | AgentType  | Yes      | Agent paradigm.                     | see [Type Definitions](#type-definitions) |
 | `goal`          | String     | Yes      | Natural language objective.         | `Analyze and report findings`             |
 | `model`         | Object     | No       | LLM configuration (for llm/hybrid). | See Model                                 |
+| `knowledge`     | Object     | No       | Reference materials for the agent.  | See Knowledge                             |
 | `observation`   | Object     | No       | What the agent can perceive.        | See Observation                           |
 | `actions`       | Object     | No       | What the agent can do.              | See Actions                               |
-| `context`       | Object     | No       | Starting position and targets.      | See Context                               |
+| `execution_context` | Object | No       | Starting position and targets.      | See Execution Context                     |
 | `resources`     | Object     | No       | Compute requirements.               | See Resources                             |
 | `depends_on`    | Array      | No       | Agents that must complete first.    | `[setup-agent.lifecycle.goal_reached]`    |
 | `communication` | Object     | No       | Inter-agent communication.          | See Communication                         |
@@ -211,8 +212,20 @@ LLM configuration for `llm` and `hybrid` agents.
 | :----------- | :------------ | :------- | :---------------------------- | :---------------------------------------- |
 | `provider`   | ModelProvider | No       | Model provider.               | see [Type Definitions](#type-definitions) |
 | `name`       | String        | No       | Model identifier.             | `claude-sonnet-4-20250514`                |
-| `parameters` | Object        | No       | Key-value store of parameters | `{temperature: 0.7, top-p: 0.95`          |
+| `version`    | String        | No       | Model version for reproducibility. | `20250514`                           |
+| `parameters` | Object        | No       | Key-value store of parameters | `{temperature: 0.7, top_p: 0.95}`         |
 | `max_tokens` | Integer       | No       | Maximum response tokens.      | `4096`                                    |
+
+### Knowledge
+
+Reference materials and knowledge bases available to the agent.
+
+| Property         | Type   | Required | Description                              | Example                        |
+| :--------------- | :----- | :------- | :--------------------------------------- | :----------------------------- |
+| `documents`      | Array  | No       | Paths or URLs to reference documents.    | `[./guides/network-recon.md]`  |
+| `embeddings_ref` | String | No       | Reference to vector store (RFC-0001).    | `telemetry.sinks.vector-db`    |
+| `schemas`        | Array  | No       | Schema files for structured knowledge.   | `[./schemas/network.json]`     |
+| `instructions`   | String | No       | Path to additional system instructions.  | `./prompts/recon-agent.md`     |
 
 ### Observation
 
@@ -250,15 +263,6 @@ What the agent can do.
 | :------------- | :---- | :------- | :---------------------- | :------------------- |
 | `capabilities` | Array | No       | Available action types. | See Capability Types |
 
-#### Capability Types
-
-| Type       | Description                  | Properties          |
-| :--------- | :--------------------------- | :------------------ |
-| `shell`    | Shell command execution      | `allowed`, `denied` |
-| `tool`     | Tool invocation              | `allowed`           |
-| `api`      | API calls                    | `allowed`, `scopes` |
-| `protocol` | Network protocol interaction | `allowed`           |
-
 #### Capability Object
 
 | Property  | Type           | Required | Description        | Example                                   |
@@ -268,15 +272,38 @@ What the agent can do.
 | `denied`  | Array          | No       | Denied values.     | `[rm -rf /]`                              |
 | `scopes`  | Array          | No       | Permission scopes. | `[read, write]`                           |
 
-### Context
+#### Capability Types
 
-Where the agent operates within the RFC-0001 environment.
+| Type       | Description                  | Properties          |
+| :--------- | :--------------------------- | :------------------ |
+| `shell`    | Shell command execution      | `allowed`, `denied` |
+| `tool`     | Tool invocation              | `allowed`           |
+| `api`      | API calls                    | `allowed`, `scopes` |
+| `protocol` | Network protocol interaction | `allowed`           |
 
-| Property  | Type   | Required | Description                           | Example                  |
-| :-------- | :----- | :------- | :------------------------------------ | :----------------------- |
-| `node`    | String | No       | Starting node (refs topology.nodes).  | `workstation-01`         |
-| `targets` | Array  | No       | Target nodes (refs topology.nodes).   | `[server-01, server-02]` |
-| `groups`  | Array  | No       | Target groups (refs RFC-0001 groups). | `[servers]`              |
+> **Note:** This list is illustrative, not exhaustive. `CapabilityType` is a `growing` tier type, so new values (e.g., `mcp`, `skill`) are expected and accepted without the `x-` prefix.
+
+### Execution Context
+
+Where the agent operates within the RFC-0001 environment. Named `execution_context`
+to distinguish from "context" in the LLM sense (conversation history, RAG context).
+
+| Property   | Type   | Required | Description                           | Example                  |
+| :--------- | :----- | :------- | :------------------------------------ | :----------------------- |
+| `node`     | String | No       | Starting node (refs topology.nodes).  | `workstation-01`         |
+| `targets`  | Array  | No       | Target nodes (refs topology.nodes).   | `[server-01, server-02]` |
+| `groups`   | Array  | No       | Target groups (refs RFC-0001 groups). | `[servers]`              |
+| `identity` | Object | No       | Starting identity and privileges.     | See Identity             |
+
+#### Identity
+
+The agent's starting identity and privilege level within the environment.
+
+| Property          | Type   | Required | Description                    | Example                                   |
+| :---------------- | :----- | :------- | :----------------------------- | :---------------------------------------- |
+| `user`            | String | No       | Active system user.            | `jsmith`                                  |
+| `privilege_level` | String | No       | Privilege tier.                | `local_user`, `domain_user`, `domain_admin`, `system` |
+| `groups`          | Array  | No       | Security groups the user is in.| `[developers, remote-users]`              |
 
 ### Resources
 
@@ -307,9 +334,11 @@ Agent spawn and termination conditions.
 | Property         | Type          | Required | Description                      | Example                                   |
 | :--------------- | :------------ | :------- | :------------------------------- | :---------------------------------------- |
 | `max_iterations` | Integer       | No       | Maximum action iterations.       | `1000`                                    |
+| `max_retries`    | Integer       | No       | Maximum retry attempts on failure. | `3`                                     |
+| `retry_backoff`  | String        | No       | Backoff strategy between retries. | `none`, `linear`, `exponential`          |
+| `loop_detection` | Boolean       | No       | Enable detection of infinite loops. | `true`                                 |
 | `timeout`        | String        | No       | Maximum runtime.                 | `1h`                                      |
 | `terminate_on`   | String        | No       | Objective that terminates agent. | `goal-reached`                            |
-| `parameters`     | Object        | No       | Key-value store of parameters    | `{temperature: 0.7, top-p: 0.95`          |
 | `restart_policy` | RestartPolicy | No       | Behavior on failure.             | see [Type Definitions](#type-definitions) |
 
 ### Agents Example
@@ -329,6 +358,9 @@ agents:
       parameters:
         temperature: 0.7
         top_p: 0.95
+    knowledge:
+      documents: [./guides/network-recon.md]
+      embeddings_ref: telemetry.sinks.vector-db
     observation:
       sources:
         - type: local
@@ -339,9 +371,12 @@ agents:
           allowed: [bash]
         - type: tool
           allowed: [nmap, curl]
-    context:
+    execution_context:
       node: attacker-01
       groups: [servers]
+      identity:
+        user: operator
+        privilege_level: local_user
     resources:
       cpu: "500m"
       memory: "1Gi"
@@ -742,7 +777,7 @@ agents:
           allowed: [bash]
         - type: tool
           allowed: [nmap, curl, dig]
-    context:
+    execution_context:
       node: workstation-01
       groups: [servers]
     resources:
