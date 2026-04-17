@@ -1,0 +1,848 @@
+---
+apiVersion: aces.io/v1alpha1
+kind: Environment
+metadata:
+  name: dreadgoad
+  description: >-
+    DreadGOAD - Game of Active Directory lab environment.
+    Multi-forest AD deployment with 3 domains, 5 hosts, and 50+
+    intentional vulnerabilities for security research and agent evaluation.
+    Based on the GOAD (Game of Active Directory) framework.
+  version: "1.0.0"
+  labels:
+    team: security-research
+    project: DreadGOAD
+    ad.forest: sevenkingdoms.local
+    ad.child_domain: north.sevenkingdoms.local
+    ad.trusted_forest: essos.local
+    trust.type: bidirectional-external
+    managed_by: terragrunt
+    source: DreadOps/apps/DreadGOAD
+
+# ==============================================================================
+# Topology
+# ==============================================================================
+topology:
+  networks:
+    goad-vpc:
+      display_name: "GOAD VPC"
+      cidr: 10.1.0.0/16
+      routing: nat
+      private_service_access:
+        - remote_management  # SSM endpoints
+        - storage            # S3 gateway endpoint
+        - logs               # CloudWatch Logs endpoint
+      labels:
+        aws.region: us-west-1
+        aws.environment: staging
+
+    goad-private:
+      display_name: "GOAD Private Subnet"
+      cidr: 10.1.3.0/24
+      routing: isolated
+      labels:
+        aws.subnet_type: private
+        purpose: ad-hosts
+
+  nodes:
+    # ------------------------------------------------------------------
+    # Domain Controllers
+    # ------------------------------------------------------------------
+    kingslanding:
+      type: host
+      display_name: "GOAD DC01 - Kingslanding"
+      hostname: kingslanding
+      computer_name: DC01
+      os: windows
+      os_version: "2019"
+      role: domain_controller
+      tier: critical
+      domain: sevenkingdoms.local
+      groups:
+        - domain_controllers
+        - parent_dc
+        - trust_hosts
+        - adcs
+        - tier0
+        - windows
+        - defender_on
+      services:
+        - ldap
+        - kerberos
+        - dns
+        - smb
+        - winrm
+        - adcs
+      features:
+        - ssm_managed
+        - firewall_disabled
+      labels:
+        ad.forest: sevenkingdoms.local
+        ad.site: HQ
+        ad.netbios: SEVENKINGDOMS
+        ad.tier: "0"
+        goad.id: dc01
+        warpgate.ami: goad-dc-base
+      notes: >-
+        Primary DC for sevenkingdoms.local (root forest).
+        Hosts ADCS with ESC10 case1/case2 templates.
+        Bidirectional external trust with essos.local.
+      network_interfaces:
+        - name: eth0
+          network: goad-private
+          ip_address: 10.1.3.10/24
+
+    winterfell:
+      type: host
+      display_name: "GOAD DC02 - Winterfell"
+      hostname: winterfell
+      computer_name: DC02
+      os: windows
+      os_version: "2019"
+      role: domain_controller
+      tier: critical
+      domain: north.sevenkingdoms.local
+      groups:
+        - domain_controllers
+        - child_dc
+        - tier0
+        - windows
+        - defender_on
+      services:
+        - ldap
+        - kerberos
+        - dns
+        - smb
+        - winrm
+      features:
+        - ssm_managed
+        - firewall_disabled
+        - llmnr_enabled
+        - nbt_ns_enabled
+      labels:
+        ad.forest: sevenkingdoms.local
+        ad.site: North
+        ad.netbios: NORTH
+        ad.tier: "0"
+        goad.id: dc02
+        warpgate.ami: goad-dc-base
+      notes: >-
+        Child domain DC for north.sevenkingdoms.local.
+        LLMNR/NBT-NS enabled for relay attacks.
+        Autologon and credential storage vulnerabilities.
+      network_interfaces:
+        - name: eth0
+          network: goad-private
+          ip_address: 10.1.3.11/24
+
+    meereen:
+      type: host
+      display_name: "GOAD DC03 - Meereen"
+      hostname: meereen
+      computer_name: DC03
+      os: windows
+      os_version: "2016"
+      role: domain_controller
+      tier: critical
+      domain: essos.local
+      groups:
+        - domain_controllers
+        - parent_dc
+        - trust_hosts
+        - adcs_customtemplates
+        - laps_dc
+        - tier0
+        - windows
+        - defender_on
+      services:
+        - ldap
+        - kerberos
+        - dns
+        - smb
+        - winrm
+        - adcs
+      features:
+        - ssm_managed
+        - firewall_disabled
+        - ntlm_downgrade
+        - laps_enabled
+      labels:
+        ad.forest: essos.local
+        ad.site: Essos
+        ad.netbios: ESSOS
+        ad.tier: "0"
+        goad.id: dc03
+        warpgate.ami: goad-mssql-base-2016
+      notes: >-
+        DC for essos.local (separate forest).
+        ADCS with ESC7, ESC13, ESC15 custom templates.
+        NTLM downgrade enabled. LAPS deployed.
+        Bidirectional external trust with sevenkingdoms.local.
+      network_interfaces:
+        - name: eth0
+          network: goad-private
+          ip_address: 10.1.3.12/24
+
+    # ------------------------------------------------------------------
+    # Member Servers
+    # ------------------------------------------------------------------
+    castelblack:
+      type: host
+      display_name: "GOAD SRV02 - Castelblack"
+      hostname: castelblack
+      computer_name: SRV02
+      os: windows
+      os_version: "2019"
+      role: server
+      tier: high
+      domain: north.sevenkingdoms.local
+      groups:
+        - servers
+        - mssql
+        - iis
+        - webdav
+        - tier1
+        - windows
+        - defender_off
+      services:
+        - mssql
+        - http
+        - smb
+        - winrm
+        - webdav
+        - iis
+      features:
+        - ssm_managed
+        - firewall_disabled
+        - defender_disabled
+        - open_shares
+      labels:
+        ad.forest: sevenkingdoms.local
+        ad.netbios: NORTH
+        ad.tier: "1"
+        goad.id: srv02
+        warpgate.ami: goad-mssql-base-2019
+        mssql.linked_server: braavos.essos.local
+      notes: >-
+        Member server in north.sevenkingdoms.local.
+        MSSQL with linked server to BRAAVOS (essos.local).
+        IIS with upload vulnerability, WebDAV enabled.
+        Defender disabled. Open shares with sensitive files.
+      network_interfaces:
+        - name: eth0
+          network: goad-private
+          ip_address: 10.1.3.20/24
+
+    braavos:
+      type: host
+      display_name: "GOAD SRV03 - Braavos"
+      hostname: braavos
+      computer_name: SRV03
+      os: windows
+      os_version: "2016"
+      role: server
+      tier: high
+      domain: essos.local
+      groups:
+        - servers
+        - mssql
+        - adcs
+        - webdav
+        - laps_server
+        - tier1
+        - windows
+        - defender_on
+      services:
+        - mssql
+        - smb
+        - winrm
+        - webdav
+        - adcs
+      features:
+        - ssm_managed
+        - firewall_disabled
+        - open_shares
+        - laps_enabled
+        - run_as_ppl
+      labels:
+        ad.forest: essos.local
+        ad.netbios: ESSOS
+        ad.tier: "1"
+        goad.id: srv03
+        warpgate.ami: goad-mssql-base-2016
+        mssql.linked_server: castelblack.north.sevenkingdoms.local
+      notes: >-
+        Member server in essos.local.
+        MSSQL with linked server to CASTELBLACK (north.sevenkingdoms.local).
+        ADCS with ESC6, ESC11 templates.
+        LAPS enabled, RunAsPPL enforced. WebDAV enabled.
+      network_interfaces:
+        - name: eth0
+          network: goad-private
+          ip_address: 10.1.3.21/24
+
+# ==============================================================================
+# Groups
+# ==============================================================================
+groups:
+  # --- Role-based ---
+  domain_controllers:
+    description: "Active Directory domain controllers"
+    type: role-based
+    tier: critical
+    members:
+      - kingslanding
+      - winterfell
+      - meereen
+
+  servers:
+    description: "Domain-joined member servers (non-DC)"
+    type: role-based
+    members:
+      - castelblack
+      - braavos
+
+  parent_dc:
+    description: "Parent/root domain controllers"
+    type: role-based
+    tier: critical
+    members:
+      - kingslanding
+      - meereen
+
+  child_dc:
+    description: "Child domain controllers"
+    type: role-based
+    tier: critical
+    members:
+      - winterfell
+
+  trust_hosts:
+    description: "Hosts participating in cross-forest trusts"
+    type: role-based
+    members:
+      - kingslanding
+      - meereen
+
+  # --- Service-based ---
+  adcs:
+    description: "Hosts running AD Certificate Services"
+    type: functional
+    members:
+      - kingslanding
+      - braavos
+
+  adcs_customtemplates:
+    description: "DCs with custom ADCS vulnerability templates"
+    type: functional
+    members:
+      - meereen
+
+  mssql:
+    description: "Hosts running Microsoft SQL Server"
+    type: functional
+    members:
+      - castelblack
+      - braavos
+
+  iis:
+    description: "Hosts running IIS web server"
+    type: functional
+    members:
+      - castelblack
+
+  webdav:
+    description: "Hosts with WebDAV enabled"
+    type: functional
+    members:
+      - castelblack
+      - braavos
+
+  # --- Infrastructure tiers ---
+  tier0:
+    description: "Tier 0 - Domain Admin level systems"
+    type: infrastructure
+    tier: critical
+    labels:
+      ad.tier: "0"
+    members:
+      - kingslanding
+      - winterfell
+      - meereen
+
+  tier1:
+    description: "Tier 1 - Server Admin level systems"
+    type: infrastructure
+    tier: high
+    labels:
+      ad.tier: "1"
+    members:
+      - castelblack
+      - braavos
+
+  # --- OS-based ---
+  windows:
+    description: "All Windows hosts"
+    type: os-based
+    members:
+      - kingslanding
+      - winterfell
+      - meereen
+      - castelblack
+      - braavos
+
+  # --- LAPS ---
+  laps_dc:
+    description: "Domain controllers with LAPS deployed"
+    type: functional
+    members:
+      - meereen
+
+  laps_server:
+    description: "Member servers with LAPS deployed"
+    type: functional
+    members:
+      - braavos
+
+  # --- Security posture ---
+  defender_on:
+    description: "Hosts with Windows Defender enabled"
+    type: functional
+    members:
+      - kingslanding
+      - winterfell
+      - meereen
+      - braavos
+
+  defender_off:
+    description: "Hosts with Windows Defender disabled"
+    type: functional
+    members:
+      - castelblack
+
+# ==============================================================================
+# Resources
+# ==============================================================================
+resources:
+  profiles:
+    dc-standard:
+      instance_type: t3.medium
+      cpus: 2
+      memory: 4Gi
+      volume:
+        size: 100Gi
+        type: gp3
+        encrypted: true
+
+    server-standard:
+      instance_type: t3.medium
+      cpus: 2
+      memory: 4Gi
+      volume:
+        size: 100Gi
+        type: gp3
+        encrypted: true
+
+  image_filters:
+    goad-dc-base:
+      owners: [self]
+      most_recent: true
+      filters:
+        name: "goad-dc-base"
+        root-device-type: ebs
+        architecture: x86_64
+      labels:
+        warpgate.template: goad-dc-base
+        os: windows-2019
+
+    goad-mssql-base-2019:
+      owners: [self]
+      most_recent: true
+      filters:
+        name: "goad-mssql-base-2019"
+        root-device-type: ebs
+        architecture: x86_64
+      labels:
+        warpgate.template: goad-mssql-base-2019
+        os: windows-2019
+
+    goad-mssql-base-2016:
+      owners: [self]
+      most_recent: true
+      filters:
+        name: "goad-mssql-base-2016"
+        root-device-type: ebs
+        architecture: x86_64
+      labels:
+        warpgate.template: goad-mssql-base-2016
+        os: windows-2016
+
+  instance_policies:
+    ssm-managed:
+      capabilities:
+        - remote_management
+        - logs
+        - storage_read
+      managed_policies:
+        - AmazonSSMManagedInstanceCore
+        - CloudWatchAgentServerPolicy
+        - AmazonS3FullAccess
+
+  security_groups:
+    goad-internal:
+      description: "Internal GOAD traffic - all protocols within VPC"
+      ingress:
+        - protocol: "-1"
+          from_port: 0
+          to_port: 65535
+          cidr_blocks: [10.1.0.0/16]
+          description: "All traffic from VPC CIDR"
+      egress:
+        - protocol: "-1"
+          from_port: 0
+          to_port: 65535
+          cidr_blocks: [0.0.0.0/0]
+          description: "All outbound traffic"
+
+    vpc-endpoints:
+      description: "HTTPS access to VPC endpoints (SSM, S3, CloudWatch)"
+      ingress:
+        - protocol: tcp
+          from_port: 443
+          to_port: 443
+          cidr_blocks: [10.1.0.0/16]
+          description: "HTTPS from VPC CIDR to endpoints"
+      egress:
+        - protocol: "-1"
+          cidr_blocks: [0.0.0.0/0]
+
+  bindings:
+    kingslanding:
+      image_filter: goad-dc-base
+      profile: dc-standard
+      instance_policy: ssm-managed
+      security_groups: [goad-internal]
+
+    winterfell:
+      image_filter: goad-dc-base
+      profile: dc-standard
+      instance_policy: ssm-managed
+      security_groups: [goad-internal]
+
+    meereen:
+      image_filter: goad-mssql-base-2016
+      profile: dc-standard
+      instance_policy: ssm-managed
+      security_groups: [goad-internal]
+
+    castelblack:
+      image_filter: goad-mssql-base-2019
+      profile: server-standard
+      instance_policy: ssm-managed
+      security_groups: [goad-internal]
+
+    braavos:
+      image_filter: goad-mssql-base-2016
+      profile: server-standard
+      instance_policy: ssm-managed
+      security_groups: [goad-internal]
+
+# ==============================================================================
+# Provisioning
+# ==============================================================================
+provisioning:
+  method: cloud_shell_ansible
+
+  playbooks:
+    # Phase 1: Base infrastructure
+    network-setup:
+      path: ansible/playbooks/network_setup.yml
+      host_type: windows
+      groups: [windows]
+      extra_vars:
+        dns_server_forwarder: "1.1.1.1"
+
+    build:
+      path: ansible/playbooks/build.yml
+      host_type: windows
+      groups: [windows]
+
+    # Phase 2: AD forest creation
+    ad-servers:
+      path: ansible/playbooks/ad-servers.yml
+      host_type: windows
+      groups: [domain_controllers]
+
+    ad-parent-domain:
+      path: ansible/playbooks/ad-parent_domain.yml
+      host_type: windows
+      groups: [parent_dc]
+
+    ad-child-domain:
+      path: ansible/playbooks/ad-child_domain.yml
+      host_type: windows
+      groups: [child_dc]
+
+    # Phase 3: Domain population
+    ad-members:
+      path: ansible/playbooks/ad-members.yml
+      host_type: windows
+      groups: [servers]
+
+    ad-trusts:
+      path: ansible/playbooks/ad-trusts.yml
+      host_type: windows
+      groups: [trust_hosts]
+
+    ad-data:
+      path: ansible/playbooks/ad-data.yml
+      host_type: windows
+      groups: [domain_controllers]
+      extra_vars:
+        domain_name: GOAD
+
+    ad-gmsa:
+      path: ansible/playbooks/ad-gmsa.yml
+      host_type: windows
+      groups: [domain_controllers]
+
+    # Phase 4: Services and policies
+    laps:
+      path: ansible/playbooks/laps.yml
+      host_type: windows
+      groups: [laps_dc, laps_server]
+
+    ad-relations:
+      path: ansible/playbooks/ad-relations.yml
+      host_type: windows
+      groups: [domain_controllers]
+
+    adcs:
+      path: ansible/playbooks/adcs.yml
+      host_type: windows
+      groups: [adcs, adcs_customtemplates]
+
+    ad-acl:
+      path: ansible/playbooks/ad-acl.yml
+      host_type: windows
+      groups: [domain_controllers]
+
+    servers-config:
+      path: ansible/playbooks/servers.yml
+      host_type: windows
+      groups: [mssql, iis, webdav]
+
+    # Phase 5: Security posture and vulnerabilities
+    security:
+      path: ansible/playbooks/security.yml
+      host_type: windows
+      groups: [windows]
+
+    vulnerabilities:
+      path: ansible/playbooks/vulnerabilities.yml
+      host_type: windows
+      groups: [windows]
+
+# ==============================================================================
+# Agent Platform
+# ==============================================================================
+agent_platform:
+  type: kubernetes
+  name: dreadgoad-agent-cluster
+  network:
+    cidr: 172.16.0.0/16
+    pod_cidr: 100.64.0.0/16
+    namespace: aces-agents
+  orchestrator:
+    type: ray
+    config:
+      head_service: ray-head.aces-agents.svc
+      dashboard_port: 8265
+  storage:
+    type: redis
+    url: redis://redis.aces-agents.svc:6379
+
+# ==============================================================================
+# Telemetry
+# ==============================================================================
+telemetry:
+  tracing:
+    backend: tempo
+    endpoint: "http://tempo:4318"
+    service_name: dreadgoad
+    metrics_generator: true
+
+  metrics:
+    backend: prometheus
+    endpoint: "http://prometheus:9090"
+    scrape_interval: 15s
+    retention: 30d
+
+  logging:
+    backend: loki
+    endpoint: "http://loki:3100/loki/api/v1/push"
+    retention: 14d
+
+  agent:
+    type: alloy
+    version: "1.6.0"
+
+  collection_points:
+    # Windows Security Event Log from all Windows hosts
+    - type: windows_security
+      groups: [windows]
+      event_ids:
+        # Authentication events
+        - 4624   # Successful logon
+        - 4625   # Failed logon
+        - 4648   # Explicit credential logon
+        # Kerberos events
+        - 4768   # TGT requested
+        - 4769   # Service ticket requested
+        - 4771   # Kerberos pre-auth failed
+        # NTLM events
+        - 4776   # NTLM credential validation
+        # Object access and privilege use
+        - 4662   # Object access (AD)
+        - 4672   # Special privileges assigned
+        # Account management
+        - 4720   # User account created
+        - 4722   # User account enabled
+        - 4724   # Password reset attempted
+        - 4728   # Member added to security group
+        - 4732   # Member added to local group
+        - 4756   # Member added to universal group
+        # Certificate Services
+        - 4886   # Certificate request received
+        - 4887   # Certificate request approved
+        - 4888   # Certificate request denied
+      format: ocsf
+
+    # MSSQL audit logs
+    - type: file
+      groups: [mssql]
+      filter: "path:C:\\Program Files\\Microsoft SQL Server\\*\\MSSQL\\Log\\*"
+      format: json
+
+    # IIS access logs
+    - type: file
+      nodes: [castelblack]
+      filter: "path:C:\\inetpub\\logs\\LogFiles\\*"
+      format: json
+
+    # Agent platform telemetry
+    - type: kubernetes_logs
+      namespace: aces-agents
+
+    - type: otel_spans
+      namespace: aces-agents
+
+  sinks:
+    loki:
+      type: loki
+      endpoint: "http://loki:3100"
+
+    tempo:
+      type: otlp
+      endpoint: "http://tempo:4317"
+
+    prometheus:
+      type: prometheus
+      endpoint: "http://prometheus:9090"
+
+  span_dimensions:
+    - service.name
+    - service.namespace
+    - host.name
+    - host.id
+    - deployment.environment
+    - deployment.name
+
+  dashboards:
+    environment-overview:
+      type: grafana
+      source: dashboards/dreadgoad-overview.json
+      datasources: [prometheus, loki, tempo]
+
+    ad-security-events:
+      type: grafana
+      source: dashboards/ad-security-events.json
+      datasources: [loki]
+
+    mssql-activity:
+      type: grafana
+      source: dashboards/mssql-activity.json
+      datasources: [loki, prometheus]
+
+  schema:
+    ref: "aces.io/schema/v1"
+    extensions: [security]
+
+  storage:
+    hot:
+      type: local
+      retention: 24h
+    warm:
+      type: s3
+      retention: 30d
+      bucket: dreadgoad-telemetry-warm
+    cold:
+      type: s3
+      retention: 1y
+      bucket: dreadgoad-telemetry-archive
+
+# ==============================================================================
+# Connectivity
+# ==============================================================================
+connectivity:
+  overlay:
+    type: tailscale
+    auth_key: secret:tailscale-dreadgoad-key
+    acl_tags:
+      - tag:dreadgoad
+      - tag:operators
+      - tag:agents
+    advertise_routes:
+      - 10.1.0.0/16
+
+  operator_access:
+    methods: [cloud_shell]
+    cloud_shell:
+      type: ssm
+      enabled: true
+      session_logging: true
+    vpn:
+      enabled: false
+    ssh:
+      enabled: false
+
+  connections:
+    agents-to-goad:
+      type: tailscale
+      source:
+        environment: dreadgoad-agent-cluster
+        cidr: 172.16.0.0/16
+        namespace: aces-agents
+      destination:
+        environment: dreadgoad
+        cidr: 10.1.0.0/16
+      policy:
+        direction: egress_only
+        allowed_ports:
+          # AD protocols
+          - 88     # Kerberos
+          - 135    # RPC Endpoint Mapper
+          - 139    # NetBIOS Session
+          - 389    # LDAP
+          - 445    # SMB
+          - 636    # LDAPS
+          - 3268   # Global Catalog
+          - 3269   # Global Catalog SSL
+          # Management
+          - 5985   # WinRM HTTP
+          - 5986   # WinRM HTTPS
+          - 3389   # RDP
+          # Services
+          - 1433   # MSSQL
+          - 80     # HTTP (IIS)
+          - 443    # HTTPS
