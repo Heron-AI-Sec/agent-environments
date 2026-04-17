@@ -6,725 +6,465 @@
 
 ## Summary
 
-This RFC proposes a declarative Scenario Definition Language (SDL) for
-composing RFC-0001 environments and RFC-0002 experiments into reproducible,
-runnable units. A scenario is the artifact an operator hands to a runtime to
-execute end-to-end.
+This RFC proposes three constructs that sit above RFC-0001 and RFC-0002:
+
+- **Scenario**: A named, versioned unit that references an RFC-0002 experiment
+  and declares how it is reset between runs.
+- **Run**: The record of a single execution of a scenario — its outcome,
+  backend, and results.
+- **Study**: A collection of scenarios and run records with associated cost,
+  scoring criteria, and metadata for research reproducibility.
+
+It also defines environment versioning semantics: what constitutes a breaking
+vs. non-breaking change to an RFC-0001 environment.
 
 RFC-0001 defines "what exists." RFC-0002 defines "what happens." This
-specification defines "what gets run" — the composition, initial state, and
-execution lifecycle that connects them.
+specification defines "what was run and what it produced."
 
 ## Motivation
 
 RFC-0001 and RFC-0002 are independently useful but leave three problems
-unresolved for end-to-end execution:
+unresolved for reproducible research:
 
-1. **No composition contract.** There is no standard way to declare which
-   environment version pairs with which experiment version. This is currently
-   an implementation detail of the runtime, making scenarios non-portable.
+1. **No named execution unit.** There is no versioned artifact that says
+   "run this experiment and record the result under this name." This is
+   currently an implementation detail of the runtime.
 
-2. **No initial state.** RFC-0001 `provisioning` configures infrastructure.
-   RFC-0002 `injects` fire during experiment execution. Neither captures the
-   pre-experiment state — specific files, data, flags, or conditions that must
-   be true *before the experiment clock starts* but are not part of
-   infrastructure setup.
+2. **No instance record.** There is no standard for recording what actually
+   happened during a run — which backend executed it, what the outcome was,
+   what it cost. Without this, reproducing or comparing results requires
+   out-of-band documentation.
 
-3. **No instance concept.** There is no distinction between a Scenario
-   (the reusable specification) and a Run (a specific execution of that
-   scenario at a point in time). Without this, reproducibility tracking,
-   result storage, and replay are implementation-specific.
+3. **No collection concept.** Research involves running multiple scenarios
+   and comparing results. There is no construct for grouping runs into a
+   named study with shared scoring criteria and cost accounting.
 
 ### Design Principles
 
-1. **Composition Only**: A scenario binds existing specs; it does not
-   redefine them
-2. **Domain-Agnostic**: No security, AI safety, or SWE-specific concepts;
-   those belong in domain extension RFCs
-3. **Optional Overlay**: RFC-0001 + RFC-0002 work without RFC-0004; this
-   spec adds reproducibility and lifecycle semantics
-4. **Minimal Initial State**: Declares what must be true before execution,
-   separate from provisioning and runtime injects
-5. **Run as First-Class**: The difference between a Scenario (template) and
-   a Run (instance) is explicit
+1. **Non-redundant**: RFC-0004 does not re-specify what RFC-0001 and RFC-0002
+   already own. Environment initial state belongs in RFC-0001. Experiment
+   objectives and scoring belong in RFC-0002.
+2. **Domain-Agnostic**: No security, AI safety, or SWE-specific concepts.
+3. **Optional Overlay**: RFC-0001 + RFC-0002 are runnable without RFC-0004.
+   This spec adds reproducibility and research-collection semantics.
+4. **Run as First-Class**: The difference between a Scenario (specification)
+   and a Run (instance) is explicit and standardized.
+
+### On Initial State
+
+Every variation in initial conditions — a different file, an extra server,
+a different OS version, a different application config — is a new
+RFC-0001 `Environment` version. RFC-0001 already specifies infrastructure
+down to applications and config mechanisms. There is no principled line to
+draw for "per-scenario" initial state that RFC-0001 does not already cross.
+
+Initial state belongs in RFC-0001. RFC-0004 does not re-open that boundary.
 
 ---
 
 ## Type Definitions
 
-| Type               | Kind            | Values                                          |
-| :----------------- | :-------------- | :---------------------------------------------- |
-| `TeardownPolicy`   | extensible-enum | `preserve`, `destroy`, `snapshot`               |
-| `ResetStrategy`    | extensible-enum | `reprovision`, `snapshot_restore`, `state_reset`|
-| `ReadyCheckType`   | extensible-enum | `http`, `tcp`, `command`, `custom`              |
-| `ArtifactSource`   | extensible-enum | `inline`, `file`, `git`, `registry`             |
-| `RunStatus`        | extensible-enum | `provisioning`, `initializing`, `running`, `completed`, `failed`, `cancelled` |
+| Type                   | Kind            | Values                                                       |
+| :--------------------- | :-------------- | :----------------------------------------------------------- |
+| `ResetStrategy`        | extensible-enum | `reprovision`, `snapshot_restore`                            |
+| `RunOutcome`           | extensible-enum | `success`, `failure`, `error`, `cancelled`                   |
+| `EnvironmentChangeClass` | extensible-enum | `breaking`, `additive`, `patch`                            |
+| `CostUnit`             | extensible-enum | `usd`, `token`, `compute_hour`                               |
 
 **Kind definitions:**
 
 - **`extensible-enum`**: A closed list of standard values. Custom values
-  allowed via `x-` prefix (e.g., `x-custom-strategy`).
+  allowed via `x-` prefix (e.g., `x-custom-outcome`).
+
+### ResetStrategy values
+
+| Value              | Description                                                      | Experimentally relevant?          |
+| :----------------- | :--------------------------------------------------------------- | :-------------------------------- |
+| `reprovision`      | Full teardown and rebuild from RFC-0001 spec                     | Yes — strongest isolation guarantee |
+| `snapshot_restore` | Restore to a known snapshot taken after provisioning             | Yes — faster but snapshot-dependent |
+
+**Note**: Reset strategy is experimentally relevant because `reprovision`
+provides stronger isolation between runs than `snapshot_restore`. A study
+comparing results across runs SHOULD record the strategy used. Runtime-only
+concerns (timeouts, teardown policy, readiness checks) are not specified here.
+
+### RunOutcome values
+
+| Value       | Description                                                        |
+| :---------- | :----------------------------------------------------------------- |
+| `success`   | Run hit an expected stop condition (RFC-0002 objectives met)       |
+| `failure`   | Run hit a failure condition or exhausted budget without succeeding |
+| `error`     | Technical or runtime error prevented completion                    |
+| `cancelled` | Run was manually stopped before reaching a stop condition          |
 
 ---
 
 ## Schema Overview
 
-| Section        | Purpose                                                      |
-| :------------- | :----------------------------------------------------------- |
-| `environment`  | Reference to RFC-0001 environment                            |
-| `experiment`   | Reference to RFC-0002 experiment                             |
-| `initial_state`| Pre-experiment state: artifacts, flags, and conditions       |
-| `lifecycle`    | Execution stages: provision, initialize, teardown, reset     |
-| `evaluation`   | Optional scenario-level success criteria and ground truth    |
+| Kind        | Purpose                                                             |
+| :---------- | :------------------------------------------------------------------ |
+| `Scenario`  | Named, versioned execution unit referencing an RFC-0002 experiment  |
+| `Run`       | Record of a single scenario execution                               |
+| `Study`     | Collection of scenarios and runs for research purposes              |
 
 ---
 
-## Root Schema
+## Scenario
 
-| Field          | Type   | Required | Description                                   | Example                        |
-| :------------- | :----- | :------- | :-------------------------------------------- | :----------------------------- |
-| `apiVersion`   | String | Yes      | Schema version.                               | `aces.io/v1alpha1`             |
-| `kind`         | String | Yes      | Resource type.                                | `Scenario`                     |
-| `metadata`     | Object | Yes      | Identifying information.                      | `{name, description, version}` |
-| `environment`  | Object | Yes      | Reference to RFC-0001 environment.            | `{ref: {name: ad-lab}}`        |
-| `experiment`   | Object | Yes      | Reference to RFC-0002 experiment.             | `{ref: {name: recon-exp}}`     |
-| `initial_state`| Object | No       | Pre-experiment conditions.                    | `{artifacts: [], flags: []}`   |
-| `lifecycle`    | Object | No       | Execution lifecycle configuration.            | `{provision: {}, teardown: {}}` |
-| `evaluation`   | Object | No       | Scenario-level success criteria.              | `{success_criteria: {}}`       |
+A Scenario is a named, versioned unit that references an RFC-0002 experiment
+and declares how it is reset between successive runs.
 
-### Example
+The environment is not declared at the scenario level. It is already
+specified in the RFC-0002 experiment via `environment.ref`. Declaring it
+again would introduce a drift and precedence problem.
 
-```yaml
----
-apiVersion: aces.io/v1alpha1
-kind: Scenario
-metadata:
-  name: example-scenario
-  description: "Example scenario binding an environment and experiment"
-  version: "1.0.0"
-  labels:
-    domain: general
-    difficulty: medium
+### Scenario Schema
 
-environment:
-  ref:
-    name: dev-environment
-    version: "1.0.0"
-  source: ./environments/dev-environment.yaml
-
-experiment:
-  ref:
-    name: exploration-experiment
-    version: "1.0.0"
-  source: ./experiments/exploration-experiment.yaml
-
-initial_state: { ... }
-lifecycle: { ... }
-evaluation: { ... }
-```
-
----
-
-## Environment
-
-References the RFC-0001 environment the scenario provisions and uses.
-
-| Property  | Type   | Required | Description                              | Example                         |
-| :-------- | :----- | :------- | :--------------------------------------- | :------------------------------ |
-| `ref`     | Object | Yes      | Reference to RFC-0001 environment.       | `{name: ad-lab, version: 1.0.0}`|
-| `source`  | String | No       | Path or URL to environment spec file.    | `./environments/ad-lab.yaml`    |
-
-### Environment Reference
-
-| Property  | Type   | Required | Description                                | Example    |
-| :-------- | :----- | :------- | :----------------------------------------- | :--------- |
-| `name`    | String | Yes      | Environment name from RFC-0001 metadata.   | `ad-lab`   |
-| `version` | String | No       | Version constraint.                        | `1.0.0`    |
-
-### Example
-
-```yaml
-environment:
-  ref:
-    name: ad-lab
-    version: "1.0.0"
-  source: ./environments/ad-lab.yaml
-```
-
----
-
-## Experiment
-
-References the RFC-0002 experiment that executes against the environment.
-
-| Property  | Type   | Required | Description                              | Example                              |
-| :-------- | :----- | :------- | :--------------------------------------- | :----------------------------------- |
-| `ref`     | Object | Yes      | Reference to RFC-0002 experiment.        | `{name: recon-exp, version: 1.0.0}`  |
-| `source`  | String | No       | Path or URL to experiment spec file.     | `./experiments/recon-exp.yaml`       |
-| `overrides`| Object| No       | Parameter overrides for this scenario.   | See Overrides                        |
+| Field            | Type           | Required | Description                               | Example                        |
+| :--------------- | :------------- | :------- | :---------------------------------------- | :----------------------------- |
+| `apiVersion`     | String         | Yes      | Schema version.                           | `aces.io/v1alpha1`             |
+| `kind`           | String         | Yes      | Resource type.                            | `Scenario`                     |
+| `metadata`       | Object         | Yes      | Identifying information.                  | `{name, description, version}` |
+| `experiment`     | Object         | Yes      | Reference to RFC-0002 experiment.         | `{ref: {name: recon-exp}}`     |
+| `reset_strategy` | ResetStrategy  | No       | How to reset between runs.                | `reprovision`                  |
+| `labels`         | Object         | No       | Arbitrary key-value labels.               | `{domain: security}`           |
 
 ### Experiment Reference
 
 | Property  | Type   | Required | Description                               | Example          |
 | :-------- | :----- | :------- | :---------------------------------------- | :--------------- |
 | `name`    | String | Yes      | Experiment name from RFC-0002 metadata.   | `recon-exp`      |
-| `version` | String | No       | Version constraint.                       | `1.0.0`, `>=1.0` |
+| `version` | String | No       | Pinned version.                           | `1.0.0`          |
+| `source`  | String | No       | Path or URL to experiment spec file.      | `./experiments/recon-exp.yaml` |
 
-### Overrides
-
-Allows a scenario to parametrize an experiment without forking it.
-Overrides are merged into the experiment spec at execution time.
-
-| Property       | Type   | Required | Description                          | Example                       |
-| :------------- | :----- | :------- | :----------------------------------- | :---------------------------- |
-| `runtime`      | Object | No       | Overrides to RFC-0002 runtime block. | `{timeout: 1h}`               |
-| `agent_params` | Object | No       | Per-agent parameter overrides.       | `{explorer: {model: {...}}}`  |
-
-### Example
-
-```yaml
-experiment:
-  ref:
-    name: exploration-experiment
-    version: "1.0.0"
-  source: ./experiments/exploration-experiment.yaml
-  overrides:
-    runtime:
-      timeout: 45m
-    agent_params:
-      explorer:
-        model:
-          name: claude-opus-4-20250514
-```
-
----
-
-## Initial State
-
-The initial state block declares what conditions must be true in the
-environment *before the experiment starts*. This is distinct from:
-
-- **RFC-0001 `provisioning`**: Configures infrastructure (OS, software,
-  services) — runs once when the environment is built.
-- **RFC-0002 `injects`**: Events fired *during* experiment execution.
-- **`initial_state`**: Specific artifacts, data, flags, or conditions that
-  represent the starting scenario context — set up after provisioning,
-  before the experiment clock starts.
-
-| Property    | Type  | Required | Description                            | Example                    |
-| :---------- | :---- | :------- | :------------------------------------- | :------------------------- |
-| `artifacts` | Array | No       | Files, repos, or data placed in env.   | See Artifact               |
-| `flags`     | Array | No       | Measurable markers (e.g., secrets).    | See Flag                   |
-| `state`     | Array | No       | Pre-set environment state properties.  | See StateAssertion         |
-| `services`  | Array | No       | Services that must be ready before start.| See ServiceReadyCheck    |
-
-### Artifact
-
-An artifact is a file, dataset, repository, or other content placed into
-the environment before the experiment runs.
-
-| Property  | Type          | Required | Description                          | Example                       |
-| :-------- | :------------ | :------- | :----------------------------------- | :---------------------------- |
-| `id`      | String        | No       | Unique identifier.                   | `target-codebase`             |
-| `type`    | ArtifactSource| Yes      | Source type.                         | `git`, `file`, `inline`       |
-| `node`    | String        | Yes      | Target node (refs RFC-0001 topology).| `dev-server`                  |
-| `path`    | String        | Yes      | Destination path on the node.        | `/workspace/repo`             |
-| `source`  | String        | No       | URI, path, or ref for the content.   | `git://github.com/org/repo`   |
-| `ref`     | String        | No       | Git commit, tag, or branch.          | `a1b2c3d4`                    |
-| `content` | String        | No       | Inline content (for `inline` type).  | `{"seed": 42}`                |
-
-### Flag
-
-A flag is a measurable artifact — a file, value, or token that acts as
-a verifiable marker for scenario outcomes (e.g., a secret to be captured,
-a ground-truth file, a baseline snapshot).
-
-| Property    | Type   | Required | Description                             | Example                      |
-| :---------- | :----- | :------- | :-------------------------------------- | :--------------------------- |
-| `id`        | String | Yes      | Unique identifier.                      | `target-secret`              |
-| `node`      | String | Yes      | Node where the flag resides.            | `db-01`                      |
-| `path`      | String | Yes      | Path of the flag file/resource.         | `/secrets/flag.txt`          |
-| `value`     | String | No       | Secret reference for the flag value.    | `secret:scenario-flag`       |
-| `labels`    | Object | No       | Arbitrary key-value labels.             | `{category: target}`         |
-
-### StateAssertion
-
-A state assertion pre-sets a named property on the environment state model
-before the experiment starts.
-
-| Property   | Type   | Required | Description                           | Example                              |
-| :--------- | :----- | :------- | :------------------------------------ | :----------------------------------- |
-| `target`   | String | Yes      | Dot-path to the state property.       | `nodes.web-01.patched`               |
-| `value`    | Any    | Yes      | Value to set.                         | `false`                              |
-| `labels`   | Object | No       | Arbitrary key-value labels.           | `{reason: intentional_vuln}`         |
-
-### ServiceReadyCheck
-
-Declares that a specific service must be reachable before the experiment
-clock starts. The lifecycle waits for all service checks to pass before
-transitioning from `initializing` to `running`.
-
-| Property    | Type          | Required | Description                          | Example                          |
-| :---------- | :------------ | :------- | :----------------------------------- | :------------------------------- |
-| `node`      | String        | Yes      | Node to check (refs RFC-0001).       | `web-01`                         |
-| `service`   | String        | Yes      | Service name.                        | `http`                           |
-| `type`      | ReadyCheckType| No       | Check type.                          | `http`, `tcp`                    |
-| `endpoint`  | String        | No       | Endpoint to probe.                   | `http://10.0.1.10/health`        |
-| `timeout`   | String        | No       | Maximum wait time.                   | `5m`                             |
-
-### Initial State Example
-
-```yaml
-initial_state:
-  artifacts:
-    - id: target-codebase
-      type: git
-      node: dev-server
-      path: /workspace/repo
-      source: git://github.com/org/target-repo
-      ref: a1b2c3d4
-
-    - id: seed-data
-      type: inline
-      node: db-01
-      path: /data/records.json
-      content: |
-        {"records": [{"id": 1, "value": "test"}]}
-
-  flags:
-    - id: target-secret
-      node: db-01
-      path: /secrets/api_key.txt
-      value: secret:scenario-api-key
-      labels:
-        category: exfiltration_target
-
-    - id: baseline-snapshot
-      node: web-01
-      path: /var/www/html/index.html
-      labels:
-        category: integrity_baseline
-
-  state:
-    - target: nodes.web-01.patched
-      value: false
-      labels:
-        reason: intentional_vulnerability
-
-  services:
-    - node: web-01
-      service: http
-      type: http
-      endpoint: http://10.0.1.10/health
-      timeout: 5m
-
-    - node: db-01
-      service: postgresql
-      type: tcp
-      endpoint: "10.0.1.20:5432"
-      timeout: 3m
-```
-
----
-
-## Lifecycle
-
-The lifecycle block governs the execution stages of a scenario run: how
-the environment is provisioned, how the handoff to the experiment occurs,
-and how the environment is handled after the run completes.
-
-| Property     | Type   | Required | Description                           | Example                        |
-| :----------- | :----- | :------- | :------------------------------------ | :----------------------------- |
-| `provision`  | Object | No       | Environment provisioning config.      | See Provision                  |
-| `initialize` | Object | No       | Pre-experiment initialization.        | See Initialize                 |
-| `teardown`   | Object | No       | Post-experiment cleanup.              | See Teardown                   |
-| `reset`      | Object | No       | Between-run reset configuration.      | See Reset                      |
-
-### Provision
-
-Controls how and when the RFC-0001 environment is provisioned.
-
-| Property      | Type   | Required | Description                               | Example     |
-| :------------ | :----- | :------- | :---------------------------------------- | :---------- |
-| `timeout`     | String | No       | Maximum provisioning time.                | `30m`       |
-| `reuse`       | Boolean| No       | Reuse already-running environment.        | `false`     |
-| `ready_checks`| Array  | No       | Checks before declaring env ready.        | See ServiceReadyCheck |
-
-`reuse: true` allows a scenario to run against a pre-provisioned environment
-instance (e.g., during iterative development), skipping provisioning.
-
-### Initialize
-
-Steps taken after provisioning and before the experiment starts. This is
-when `initial_state` artifacts and flags are placed.
-
-| Property  | Type   | Required | Description                                | Example |
-| :-------- | :----- | :------- | :----------------------------------------- | :------ |
-| `timeout` | String | No       | Maximum initialization time.               | `10m`   |
-| `order`   | Array  | No       | Explicit ordering of initial_state items.  | `[target-codebase, seed-data, target-secret]` |
-
-The runtime applies `initial_state` items in dependency order by default.
-Use `order` to override when explicit sequencing is required.
-
-### Teardown
-
-What happens to the environment after the experiment completes.
-
-| Property     | Type          | Required | Description                               | Example      |
-| :----------- | :------------ | :------- | :---------------------------------------- | :----------- |
-| `on_success` | TeardownPolicy| No       | Policy when experiment succeeds.          | `destroy`    |
-| `on_failure` | TeardownPolicy| No       | Policy when experiment fails.             | `preserve`   |
-| `timeout`    | String        | No       | Maximum teardown time.                    | `10m`        |
-
-#### Teardown Policies
-
-| Policy      | Description                                               |
-| :---------- | :-------------------------------------------------------- |
-| `preserve`  | Keep environment running (e.g., for debugging)            |
-| `destroy`   | Destroy all environment resources                         |
-| `snapshot`  | Snapshot environment state before destroying              |
-
-### Reset
-
-How to restore the environment to `initial_state` between successive runs
-of the same scenario (e.g., for repeated evaluation, benchmarking).
-
-| Property   | Type          | Required | Description                           | Example              |
-| :--------- | :------------ | :------- | :------------------------------------ | :------------------- |
-| `strategy` | ResetStrategy | No       | Reset method.                         | `snapshot_restore`   |
-| `timeout`  | String        | No       | Maximum reset time.                   | `15m`                |
-
-#### Reset Strategies
-
-| Strategy           | Description                                                    |
-| :----------------- | :------------------------------------------------------------- |
-| `reprovision`      | Tear down and reprovision from scratch (slowest, most reliable)|
-| `snapshot_restore` | Restore from a snapshot taken after initialization             |
-| `state_reset`      | Apply `initial_state` items in place without reprovisioning    |
-
-### Lifecycle Example
-
-```yaml
-lifecycle:
-  provision:
-    timeout: 30m
-    reuse: false
-    ready_checks:
-      - node: web-01
-        service: http
-        type: http
-        endpoint: http://10.0.1.10/health
-        timeout: 5m
-
-  initialize:
-    timeout: 10m
-    order:
-      - target-codebase
-      - seed-data
-      - target-secret
-
-  teardown:
-    on_success: destroy
-    on_failure: preserve
-    timeout: 10m
-
-  reset:
-    strategy: snapshot_restore
-    timeout: 5m
-```
-
----
-
-## Evaluation
-
-The evaluation block declares scenario-level success criteria and ground
-truth. It is optional — RFC-0002 objectives are the primary evaluation
-mechanism. This block extends or overrides them at the scenario level.
-
-| Property           | Type   | Required | Description                                 | Example                    |
-| :----------------- | :----- | :------- | :------------------------------------------ | :------------------------- |
-| `success_criteria` | Object | No       | Compound pass/fail for the scenario.        | See Success Criteria       |
-| `ground_truth`     | Object | No       | Expected end state for correctness checks.  | See Ground Truth           |
-| `scoring`          | Object | No       | Scenario-level scoring overrides.           | See Scoring Override       |
-
-### Success Criteria
-
-Compound conditions that determine whether the scenario as a whole passed.
-References RFC-0002 objective names and RFC-0004 flag identifiers.
-
-```yaml
-success_criteria:
-  all:
-    - objective: main-task-complete     # refs RFC-0002 objectives
-    - objective: report-generated
-  any:
-    - flag: target-secret               # refs initial_state.flags
-    - objective: secondary-goal
-```
-
-Compound logic follows the same `all` / `any` pattern as RFC-0002 conditions.
-
-### Ground Truth
-
-Declares the expected end state of the environment after a correct run.
-Used for automated correctness validation.
-
-| Property              | Type  | Required | Description                              | Example                              |
-| :-------------------- | :---- | :------- | :--------------------------------------- | :----------------------------------- |
-| `expected_artifacts`  | Array | No       | Files that must exist at end of run.     | `[{node: web-01, path: /output/result.json}]` |
-| `expected_state`      | Array | No       | State expressions that must be true.     | `[{expr: "nodes.db-01.intact == true"}]`      |
-| `expected_flags_intact`| Array| No       | Flags that must NOT have been accessed.  | `[baseline-snapshot]`                |
-
-### Scoring Override
-
-Overrides RFC-0002 `runtime.scoring` for this scenario.
-
-| Property        | Type   | Required | Description                       | Example      |
-| :-------------- | :----- | :------- | :-------------------------------- | :----------- |
-| `pass_threshold`| Float  | No       | Minimum score to consider passing.| `80.0`       |
-| `normalize`     | Boolean| No       | Normalize final score to 0-100.   | `true`       |
-
-### Evaluation Example
-
-```yaml
-evaluation:
-  success_criteria:
-    all:
-      - objective: task-complete
-      - objective: report-generated
-
-  ground_truth:
-    expected_artifacts:
-      - node: web-01
-        path: /output/results.json
-    expected_state:
-      - expr: "nodes.db-01.integrity == true"
-    expected_flags_intact:
-      - baseline-snapshot
-
-  scoring:
-    pass_threshold: 75.0
-    normalize: true
-```
-
----
-
-## The Run Model
-
-A **Scenario** is a reusable specification. A **Run** is a single execution
-of that scenario at a specific point in time. The runtime creates Run
-records when executing a scenario; the schema defines what a Run captures.
-
-This distinction enables:
-
-- **Reproducibility**: A scenario at a fixed version + a run record = a
-  fully reproducible result
-- **Result storage**: Run records are the unit of experiment history
-- **Replay**: Re-running a scenario re-creates the initial state and
-  re-executes the experiment
-
-### Run Record
-
-Run records are created and managed by the runtime (`aces-runtime`), not
-declared by the operator. The schema defines what fields a Run record must
-contain.
-
-| Field           | Type      | Description                                    | Example                       |
-| :-------------- | :-------- | :--------------------------------------------- | :---------------------------- |
-| `id`            | String    | Unique run identifier.                         | `run-abc123`                  |
-| `scenario`      | Object    | Scenario reference (name + version).           | `{name: example, version: 1.0.0}` |
-| `environment`   | Object    | Environment reference + instance ID.           | `{name: ad-lab, instance: env-xyz}` |
-| `experiment`    | Object    | Experiment reference.                          | `{name: recon-exp}`           |
-| `status`        | RunStatus | Current run status.                            | see [Type Definitions](#type-definitions) |
-| `started_at`    | String    | ISO 8601 start timestamp.                      | `2024-01-15T10:00:00Z`        |
-| `completed_at`  | String    | ISO 8601 completion timestamp.                 | `2024-01-15T11:30:00Z`        |
-| `duration`      | String    | Total run duration.                            | `1h30m`                       |
-| `results`       | Object    | Objective outcomes and final score.            | `{score: 85.0, objectives: {}}` |
-| `labels`        | Object    | Arbitrary key-value labels.                    | `{run_by: researcher-a}`      |
-
-### Run Lifecycle
-
-```text
-Scenario spec
-      │
-      ▼
- provisioning ──► initializing ──► running ──► completed
-      │                │               │            │
-   (RFC-0001)    (initial_state)  (RFC-0002)    (evaluation)
-      │                                               │
-   on_failure ────────────────────────────────► preserve / destroy / snapshot
-```
-
----
-
-## Complete Example
+### Scenario Example
 
 ```yaml
 ---
 apiVersion: aces.io/v1alpha1
 kind: Scenario
 metadata:
-  name: web-exploration-scenario
-  description: "Agent explores web environment and produces recon report"
+  name: ad-recon-scenario
+  description: "Agent performs Active Directory reconnaissance"
   version: "1.0.0"
   labels:
-    domain: general
+    domain: security
     difficulty: medium
-    repeatable: "true"
-
-environment:
-  ref:
-    name: dev-environment
-    version: "1.0.0"
-  source: ./environments/dev-environment.yaml
 
 experiment:
   ref:
-    name: exploration-experiment
+    name: ad-recon-experiment
     version: "1.0.0"
-  source: ./experiments/exploration-experiment.yaml
-  overrides:
-    runtime:
-      timeout: 1h
+  source: ./experiments/ad-recon.yaml
 
-initial_state:
-  artifacts:
-    - id: seed-data
-      type: inline
-      node: db-01
-      path: /data/records.json
-      content: |
-        {"records": [{"id": 1, "name": "alpha"}, {"id": 2, "name": "beta"}]}
-
-  flags:
-    - id: target-record
-      node: db-01
-      path: /data/secret_record.txt
-      value: secret:scenario-target-record
-      labels:
-        category: primary_target
-
-    - id: web-baseline
-      node: web-01
-      path: /var/www/html/index.html
-      labels:
-        category: integrity_baseline
-
-  state:
-    - target: nodes.web-01.endpoints_seeded
-      value: true
-
-  services:
-    - node: web-01
-      service: http
-      type: http
-      endpoint: http://10.0.1.10/health
-      timeout: 5m
-    - node: db-01
-      service: postgresql
-      type: tcp
-      endpoint: "10.0.1.20:5432"
-      timeout: 3m
-
-lifecycle:
-  provision:
-    timeout: 30m
-    reuse: false
-
-  initialize:
-    timeout: 10m
-    order: [seed-data, target-record, web-baseline]
-
-  teardown:
-    on_success: destroy
-    on_failure: preserve
-    timeout: 10m
-
-  reset:
-    strategy: snapshot_restore
-    timeout: 5m
-
-evaluation:
-  success_criteria:
-    all:
-      - objective: environment-mapped
-      - objective: report-generated
-
-  ground_truth:
-    expected_artifacts:
-      - node: web-01
-        path: /output/report.md
-    expected_flags_intact:
-      - web-baseline
-
-  scoring:
-    pass_threshold: 75.0
-    normalize: true
+reset_strategy: reprovision
 ```
 
 ---
 
-## Domain Extension Points
+## Run
 
-This specification is intentionally domain-agnostic. Domain-specific
-constructs are expressed through:
+A Run is the record of a single execution of a Scenario. Run records are
+created by the runtime (`aces-runtime`), not declared by operators. This
+specification defines what a Run record MUST contain for reproducibility.
 
-1. **`initial_state.flags`**: Domain semantics via labels
-   (e.g., `{category: exfiltration_target}` for security)
-2. **`evaluation.success_criteria`**: Compound conditions referencing
-   RFC-0002 objectives with domain-meaningful names
-3. **`initial_state.state`**: Pre-set domain-specific state properties
-4. **Domain extension RFCs**: Security scenarios use RFC-0005 overlays;
-   AI safety scenarios define their own domain RFC
+### Run Record Schema
 
-Domain extensions MAY extend this schema with additional fields (e.g., an
-AI safety domain RFC may add a `trust_model` block, a security domain RFC
-may add an `attack_graph_seed` block), provided they do not modify the
-semantics of the base fields defined here.
+| Field              | Type          | Required | Description                                      | Example                          |
+| :----------------- | :------------ | :------- | :----------------------------------------------- | :------------------------------- |
+| `id`               | String        | Yes      | Unique run identifier.                           | `run-abc123`                     |
+| `scenario`         | Object        | Yes      | Scenario name and pinned version.                | `{name: ad-recon, version: 1.0.0}` |
+| `experiment`       | Object        | Yes      | Experiment name and pinned version.              | `{name: ad-recon-exp, version: 1.0.0}` |
+| `environment`      | Object        | Yes      | Environment name and pinned version.             | `{name: ad-lab, version: 1.0.0}` |
+| `backend`          | Object        | Yes      | Runtime backend that executed the run.           | See Backend                      |
+| `reset_strategy`   | ResetStrategy | Yes      | Strategy used for this run.                      | `reprovision`                    |
+| `outcome`          | RunOutcome    | Yes      | Run outcome.                                     | `success`                        |
+| `started_at`       | String        | Yes      | ISO 8601 start timestamp.                        | `2025-01-15T10:00:00Z`           |
+| `completed_at`     | String        | Yes      | ISO 8601 completion timestamp.                   | `2025-01-15T11:30:00Z`           |
+| `duration`         | String        | Yes      | Total run duration.                              | `1h30m`                          |
+| `results`          | Object        | No       | Objective outcomes and final score from RFC-0002.| `{score: 85.0, objectives: {}}` |
+| `cost`             | Object        | No       | Cost of this run.                                | See Cost                         |
+| `labels`           | Object        | No       | Arbitrary key-value labels.                      | `{run_by: researcher-a}`         |
+
+### Backend
+
+Records which runtime and infrastructure executed the run.
+
+| Property  | Type   | Required | Description                      | Example                |
+| :-------- | :----- | :------- | :------------------------------- | :--------------------- |
+| `name`    | String | Yes      | Backend identifier.              | `aces-runtime-prod`    |
+| `type`    | String | Yes      | Runtime type.                    | `kubernetes`, `docker` |
+| `version` | String | No       | Runtime version.                 | `0.8.1`                |
+| `region`  | String | No       | Cloud region or datacenter.      | `us-east-1`            |
+
+### Cost
+
+Records the resource cost of executing a run.
+
+| Property  | Type     | Required | Description                      | Example     |
+| :-------- | :------- | :------- | :------------------------------- | :---------- |
+| `total`   | Float    | Yes      | Total cost.                      | `4.32`      |
+| `unit`    | CostUnit | Yes      | Cost unit.                       | `usd`       |
+| `breakdown`| Object  | No       | Per-component cost breakdown.    | `{llm_api: 2.10, compute: 2.22}` |
+
+### Run Record Example
+
+```yaml
+id: run-7f3a1c
+scenario:
+  name: ad-recon-scenario
+  version: "1.0.0"
+experiment:
+  name: ad-recon-experiment
+  version: "1.0.0"
+environment:
+  name: ad-lab
+  version: "1.0.0"
+backend:
+  name: aces-runtime-prod
+  type: kubernetes
+  version: "0.8.1"
+  region: us-east-1
+reset_strategy: reprovision
+outcome: success
+started_at: "2025-01-15T10:00:00Z"
+completed_at: "2025-01-15T11:23:00Z"
+duration: 1h23m
+results:
+  score: 87.5
+  objectives:
+    environment-mapped:
+      achieved: true
+      reward: 50.0
+    report-generated:
+      achieved: true
+      reward: 37.5
+cost:
+  total: 4.32
+  unit: usd
+  breakdown:
+    llm_api: 2.10
+    compute: 2.22
+```
+
+---
+
+## Study
+
+A Study is a named collection of scenarios and run records. It is the
+unit of a research experiment — grouping related scenarios, specifying how
+results are scored across runs, and tracking aggregate cost.
+
+### Study Schema
+
+| Field              | Type   | Required | Description                                      | Example                      |
+| :----------------- | :----- | :------- | :----------------------------------------------- | :--------------------------- |
+| `apiVersion`       | String | Yes      | Schema version.                                  | `aces.io/v1alpha1`           |
+| `kind`             | String | Yes      | Resource type.                                   | `Study`                      |
+| `metadata`         | Object | Yes      | Identifying information.                         | `{name, description, version}` |
+| `scenarios`        | Array  | Yes      | Scenario references included in this study.      | See Scenario Reference       |
+| `runs`             | Array  | No       | Run record references or inline run records.     | See Run Reference            |
+| `scoring_criteria` | Object | No       | Cross-run scoring and evaluation criteria.       | See Scoring Criteria         |
+| `cost`             | Object | No       | Aggregate cost across all runs in the study.     | See Study Cost               |
+| `labels`           | Object | No       | Arbitrary key-value labels.                      | `{paper: arxiv-2025-001}`    |
+
+### Scenario Reference
+
+| Property  | Type   | Required | Description                        | Example                          |
+| :-------- | :----- | :------- | :--------------------------------- | :------------------------------- |
+| `name`    | String | Yes      | Scenario name.                     | `ad-recon-scenario`              |
+| `version` | String | No       | Pinned scenario version.           | `1.0.0`                          |
+| `source`  | String | No       | Path or URL to scenario spec file. | `./scenarios/ad-recon.yaml`      |
+
+### Run Reference
+
+Run records can be referenced by ID or included inline.
+
+| Property  | Type   | Required | Description                        | Example          |
+| :-------- | :----- | :------- | :--------------------------------- | :--------------- |
+| `id`      | String | No       | Run record ID (external reference).| `run-7f3a1c`     |
+| `source`  | String | No       | Path to run record file.           | `./runs/run-7f3a1c.yaml` |
+
+### Scoring Criteria
+
+Declares how runs in this study are evaluated and compared.
+RFC-0002 defines per-experiment objectives and scoring. `scoring_criteria`
+provides cross-run and cross-scenario evaluation for the study as a whole.
+
+| Property    | Type   | Required | Description                                       | Example                            |
+| :---------- | :----- | :------- | :------------------------------------------------ | :--------------------------------- |
+| `ref`       | String | No       | Path or URL to a scoring rubric or test suite.    | `./criteria/rubric.md`             |
+| `evaluator` | String | No       | Evaluator identifier for automated scoring.       | `aces.evaluators.security_control` |
+| `params`    | Object | No       | Parameters passed to the evaluator.               | `{pass_threshold: 0.8}`            |
+| `aggregate` | String | No       | How to aggregate scores across runs.              | `mean`, `min`, `max`, `median`     |
+
+### Study Cost
+
+Aggregate cost tracking across all runs in the study.
+
+| Property    | Type     | Required | Description                          | Example     |
+| :---------- | :------- | :------- | :----------------------------------- | :---------- |
+| `total`     | Float    | No       | Total cost across all runs.          | `43.20`     |
+| `unit`      | CostUnit | Yes      | Cost unit.                           | `usd`       |
+| `per_run`   | Object   | No       | Per-run cost map (run ID → cost).    | `{run-7f3a1c: 4.32}` |
+
+### Study Example
+
+```yaml
+---
+apiVersion: aces.io/v1alpha1
+kind: Study
+metadata:
+  name: ad-control-evaluation-2025
+  description: "Evaluating LLM agent control under AD attack conditions"
+  version: "1.0.0"
+  labels:
+    paper: arxiv-2025-001
+    authors: [researcher-a, researcher-b]
+
+scenarios:
+  - name: ad-recon-scenario
+    version: "1.0.0"
+    source: ./scenarios/ad-recon.yaml
+  - name: ad-escalation-scenario
+    version: "1.0.0"
+    source: ./scenarios/ad-escalation.yaml
+
+runs:
+  - source: ./runs/run-7f3a1c.yaml
+  - source: ./runs/run-9b2d4e.yaml
+  - source: ./runs/run-3c8f1a.yaml
+
+scoring_criteria:
+  ref: ./criteria/control-eval-rubric.md
+  evaluator: aces.evaluators.control_evaluation
+  params:
+    pass_threshold: 0.75
+    main_task_weight: 0.6
+    safety_weight: 0.4
+  aggregate: mean
+
+cost:
+  total: 43.20
+  unit: usd
+  per_run:
+    run-7f3a1c: 4.32
+    run-9b2d4e: 3.98
+    run-3c8f1a: 4.11
+```
+
+---
+
+## Environment Versioning Rule
+
+RFC-0001 environments are versioned. This section defines what constitutes
+each class of version change, which matters for reproducibility: runs
+against different environment versions are not directly comparable without
+understanding what changed.
+
+### Change Classes
+
+| Class      | RFC-0001 Change Type                                      | Version Increment  | Runs comparable? |
+| :--------- | :-------------------------------------------------------- | :----------------- | :--------------- |
+| `breaking` | Topology change (add/remove node, network, or edge)       | Major (`X.0.0`)    | No               |
+| `breaking` | OS, OS version, or OS distribution change on any node     | Major (`X.0.0`)    | No               |
+| `breaking` | Application change (add/remove service or provisioner)    | Major (`X.0.0`)    | No               |
+| `additive` | New group, new label, new resource profile                | Minor (`x.Y.0`)    | With caveat      |
+| `additive` | New telemetry sink or collection point                    | Minor (`x.Y.0`)    | With caveat      |
+| `patch`    | Config correction, documentation, non-structural fix      | Patch (`x.y.Z`)    | Yes              |
+
+**"With caveat"**: Additive changes do not alter existing nodes or topology
+but may affect what agents can observe or do. Studies SHOULD document
+environment versions used. Cross-version comparison within a study requires
+explicit justification.
+
+### Environment Changelog
+
+RFC-0001 environments SHOULD include a `changelog` in metadata describing
+what changed between versions. This is not enforced by the schema but is
+required for reproducible studies.
+
+```yaml
+# RFC-0001 environment metadata example
+metadata:
+  name: ad-lab
+  version: "2.0.0"
+  changelog:
+    - version: "2.0.0"
+      class: breaking
+      description: "Added ubuntu-srv-02 node to corp-lan network"
+    - version: "1.1.0"
+      class: additive
+      description: "Added network_pcap collection point for corp-lan"
+    - version: "1.0.0"
+      class: patch
+      description: "Initial version"
+```
+
+### Evolving / Dynamic Ranges
+
+Some experiments require the environment to change during execution (e.g.,
+nodes joining or leaving mid-run, threat actors introduced dynamically).
+RFC-0001 currently specifies static environments. Dynamic range updates
+are not covered in this RFC.
+
+**Recommendation**: Dynamic range state changes during an active run are
+modeled as RFC-0002 `injects` of `type: state`. Structural topology changes
+during a run (add/remove node) are a future RFC-0001 extension. A Run
+record MUST capture the environment version at run start; if the environment
+is mutated mid-run via injects, those injects are captured in the
+RFC-0002 experiment spec and are visible in RFC-0003 telemetry.
 
 ---
 
 ## Alternatives Considered
 
-### Embed Scenario in RFC-0002
+### Include environment reference in Scenario
 
-Rejected because:
+Rejected: RFC-0002 `experiment.environment.ref` already carries this.
+A second reference at the scenario level creates drift and an unresolved
+precedence problem when the two diverge.
 
-- RFC-0002 defines agent behavior; scenario composition is a separate concern
-- An experiment should be reusable across different initial states
-- Lifecycle management (provision/reset/teardown) does not belong in the
-  experiment spec
+### Include overrides in Scenario
 
-### Inline Environment and Experiment
+Rejected: RFC-0002 has no parameterization mechanism. Overrides would
+require either a fork of the experiment spec or a merge semantics that
+is not defined. If parameterization is needed, it should be designed as
+a first-class feature of RFC-0002, not worked around in RFC-0004.
 
-Allow scenario to embed full environment and experiment definitions inline
-rather than by reference.
+### Include evaluation / ground truth in Scenario
 
-Rejected because:
+Rejected: Evaluation is already defined per-experiment in RFC-0002
+objectives and scoring. Ground truth IS the specific environment version
+used in the run — it is captured in the Run record's `environment` field,
+not re-specified here.
 
-- Breaks reusability — the same environment cannot be shared across scenarios
-- Creates duplication and version drift
-- References with overrides provide the same flexibility without duplication
+### Include initial state in Scenario
 
-### Merge with RFC-0001 as a `ScenarioEnvironment` kind
+Rejected: Every meaningful variation in initial conditions (different file,
+different config, different server count) is a new RFC-0001 environment
+version. There is no principled line to draw for per-scenario initial state
+that RFC-0001 does not already cross. Initial state belongs in RFC-0001.
 
-Rejected because:
+### Cost in RFC-0003
 
-- Violates RFC-0001's design principle: environments define "what exists,"
-  not "what gets run"
-- An environment is provisioned once; a scenario may run many times against
-  the same environment
+Cost attributes could be placed in RFC-0003 observability telemetry.
+Rejected for study-level cost: study cost is a research accounting concept,
+not a telemetry event. Run-level cost in the Run record is the right
+location because it is a property of the execution instance, not a
+stream of telemetry events. Per-LLM-call token cost metrics can still
+appear in RFC-0003 telemetry.
 
 ---
 
 ## Affected Repos
 
-| Repository        | Changes Required                                             |
-| :---------------- | :----------------------------------------------------------- |
-| `aces-schema`     | JSON Schema for Scenario kind and Run record                 |
-| `aces-sdl`        | Parse and validate Scenario specs, resolve environment and experiment refs |
-| `aces-runtime`    | Execute lifecycle stages, create Run records, manage reset   |
-| `aces-evaluation` | Evaluate scenario-level success criteria and ground truth    |
+| Repository        | Changes Required                                                     |
+| :---------------- | :------------------------------------------------------------------- |
+| `aces-schema`     | JSON Schema for `Scenario`, `Run`, and `Study` kinds                 |
+| `aces-sdl`        | Parse and validate Scenario and Study specs                          |
+| `aces-runtime`    | Create Run records with outcome, backend, cost, reset_strategy       |
+| `aces-evaluation` | Study-level scoring via scoring_criteria evaluators                  |
 
 ---
 
@@ -732,26 +472,28 @@ Rejected because:
 
 ### What Becomes Easier
 
-- **Reproducibility**: A scenario version + run record fully describes an execution
-- **Benchmarking**: Reset between runs enables repeated evaluation on the same scenario
-- **Portability**: Scenario specs are self-contained and shareable
-- **Separation of concerns**: Initial state, provisioning, and runtime injects are clearly distinct
-- **Domain extension**: Domain-specific overlays extend the base without forking it
+- **Reproducibility**: Run record pins scenario, experiment, environment,
+  backend, and reset strategy — sufficient to reproduce any run
+- **Cost accounting**: Studies track total and per-run cost
+- **Cross-run comparison**: Study groups runs; scoring criteria defines
+  how to compare them
+- **Environment evolution**: Changelog + change classes make it clear when
+  cross-version comparison is valid
 
 ### What Becomes Harder
 
-- **Simple runs**: Single-file experiments now require two or three files
-  (environment, experiment, scenario) for full lifecycle management
-- **Versioning**: Environment and experiment versions must be coordinated
-  when either changes
+- **Simple runs**: Researchers who want a run record must use a runtime that
+  implements the Run schema
+- **Dynamic environments**: Mid-run topology changes are not yet addressed
+  in RFC-0001; this RFC defers them
 
 ---
 
 ## Cross-References
 
-| Document                           | Relationship                                           |
-| :--------------------------------- | :----------------------------------------------------- |
-| RFC-0001: Environment Infrastructure | Defines the environment the scenario provisions       |
-| RFC-0002: Agentic Experiment       | Defines the experiment the scenario executes           |
-| RFC-0003: Observability Schema     | Telemetry emitted during scenario execution            |
-| RFC-0005: Security Domain Schema   | Optional security-domain overlay for scenarios         |
+| Document                             | Relationship                                              |
+| :----------------------------------- | :-------------------------------------------------------- |
+| RFC-0001: Environment Infrastructure | Environment versioned and referenced by Run records       |
+| RFC-0002: Agentic Experiment         | Experiment referenced by Scenario; objectives define Run results |
+| RFC-0003: Observability Schema       | Telemetry emitted during runs; per-call cost metrics      |
+| RFC-0005: Security Domain Schema     | Domain-specific scenario and study labels for security    |
