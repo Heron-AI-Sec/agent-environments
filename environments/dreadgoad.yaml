@@ -10,6 +10,7 @@ metadata:
     Based on the GOAD (Game of Active Directory) framework.
   version: "1.0.0"
   labels:
+    rfc: "0001"
     team: security-research
     project: DreadGOAD
     ad.forest: sevenkingdoms.local
