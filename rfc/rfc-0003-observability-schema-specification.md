@@ -33,13 +33,13 @@ Consistent telemetry semantics enable:
 
 ## Schema Overview
 
-| Section       | Purpose                                  |
-| :------------ | :--------------------------------------- |
-| `attributes`        | Standard attribute definitions and types          |
-| `taxonomy`          | Event categories and classes                      |
-| `agent_decisions`   | Structured records emitted per agent decision     |
-| `correlation`       | Patterns for linking related telemetry            |
-| `extensions`        | Domain-specific schema additions                  |
+| Section           | Purpose                                       |
+| :---------------- | :-------------------------------------------- |
+| `attributes`      | Standard attribute definitions and types      |
+| `taxonomy`        | Event categories and classes                  |
+| `agent_decisions` | Structured records emitted per agent decision |
+| `correlation`     | Patterns for linking related telemetry        |
+| `extensions`      | Domain-specific schema additions              |
 
 ---
 
@@ -51,56 +51,56 @@ Core attributes appear across all telemetry types (spans, logs, metrics).
 
 Identify the source of telemetry.
 
-| Attribute              | Type   | Description                      | Example                           |
-| :--------------------- | :----- | :------------------------------- | :-------------------------------- |
-| `experiment.name`      | String | Experiment identifier            | `exploration-001`                 |
-| `experiment.version`   | String | Experiment version               | `1.0.0`                           |
-| `experiment.agents`    | Object | Active agents                    | `[explorer-agent, network-agent]` |
-| `experiment.phase`     | String | Current execution phase          | `exploration`                     |
-| `experiment.resources` | Array  | External resources for agents    | `[guide-1.md, kb-security.json]`  |
-| `environment.name`     | String | RFC-0001 environment name        | `dev-environment`                 |
-| `environment.version`  | String | Environment version              | `1.0.0`                           |
+| Attribute              | Type   | Description                   | Example                           |
+| :--------------------- | :----- | :---------------------------- | :-------------------------------- |
+| `experiment.name`      | String | Experiment identifier         | `exploration-001`                 |
+| `experiment.version`   | String | Experiment version            | `1.0.0`                           |
+| `experiment.agents`    | Object | Active agents                 | `[explorer-agent, network-agent]` |
+| `experiment.phase`     | String | Current execution phase       | `exploration`                     |
+| `experiment.resources` | Array  | External resources for agents | `[guide-1.md, kb-security.json]`  |
+| `environment.name`     | String | RFC-0001 environment name     | `dev-environment`                 |
+| `environment.version`  | String | Environment version           | `1.0.0`                           |
 
 ### Agent Attributes
 
 Identify the agent producing or triggering telemetry.
 
-| Attribute           | Type   | Description                | Example                      |
-| :------------------ | :----- | :------------------------- | :--------------------------- |
+| Attribute           | Type   | Description                                  | Example                      |
+| :------------------ | :----- | :------------------------------------------- | :--------------------------- |
 | `agent.name`        | String | Agent name — map key from RFC-0002 `agents`. | `explorer-agent`             |
-| `agent.type`        | String | Agent paradigm             | `llm`, `rl`, `scripted`      |
-| `agent.role`        | String | Functional role            | `orchestrator`, `specialist` |
-| `agent.instance_id` | String | Unique instance identifier | `explorer-agent-7f8a9b`      |
+| `agent.type`        | String | Agent paradigm                               | `llm`, `rl`, `scripted`      |
+| `agent.role`        | String | Functional role                              | `orchestrator`, `specialist` |
+| `agent.instance_id` | String | Unique instance identifier                   | `explorer-agent-7f8a9b`      |
 
 ### Action Attributes
 
 Describe agent actions. An action is a logical unit of work (e.g. "scan_and_sort_network") that may involve multiple tool calls. Each tool call within an action produces a child span using `action.tool_call.*` attributes.
 
-| Attribute            | Type    | Description                                                       | Example                              |
-| :------------------- | :------ | :---------------------------------------------------------------- | :----------------------------------- |
-| `action.id`          | String  | Unique action identifier. Used for correlation (see `action_id`). | `action-7f3a1c`                      |
-| `action.name`        | String  | Human-readable action label.                                      | `scan_and_sort_network`              |
-| `action.type`        | String  | Action category.                                                  | `shell`, `tool`, `api`               |
-| `action.role`        | String  | Role for the action.                                              | `root`, `user`                       |
-| `action.input`       | String  | Action input (may be truncated).                                  | `nmap -sV 10.0.1.0/24`               |
-| `action.output`      | String  | Action output (may be truncated).                                 | `Host 10.0.1.10 is up...`            |
-| `action.status`      | String  | Outcome status.                                                   | `success`, `failure`, `timeout`      |
-| `action.duration_ms` | Integer | Execution duration in milliseconds.                               | `1523`                               |
-| `action.iteration`   | Integer | Action sequence number for agent.                                 | `42`                                 |
+| Attribute            | Type    | Description                                                       | Example                         |
+| :------------------- | :------ | :---------------------------------------------------------------- | :------------------------------ |
+| `action.id`          | String  | Unique action identifier. Used for correlation (see `action_id`). | `action-7f3a1c`                 |
+| `action.name`        | String  | Human-readable action label.                                      | `scan_and_sort_network`         |
+| `action.type`        | String  | Action category.                                                  | `shell`, `tool`, `api`          |
+| `action.role`        | String  | Role for the action.                                              | `root`, `user`                  |
+| `action.input`       | String  | Action input (may be truncated).                                  | `nmap -sV 10.0.1.0/24`          |
+| `action.output`      | String  | Action output (may be truncated).                                 | `Host 10.0.1.10 is up...`       |
+| `action.status`      | String  | Outcome status.                                                   | `success`, `failure`, `timeout` |
+| `action.duration_ms` | Integer | Execution duration in milliseconds.                               | `1523`                          |
+| `action.iteration`   | Integer | Action sequence number for agent.                                 | `42`                            |
 
 #### Action Tool Call Attributes
 
 Each tool invocation within an action produces a child span with these attributes.
 
-| Attribute                    | Required | Description                                     |
-| :--------------------------- | :------- | :---------------------------------------------- |
-| `action.tool_call.id`        | Yes      | Unique identifier for this tool execution.      |
-| `action.tool_call.name`      | Yes      | Tool or command invoked.                        |
-| `action.tool_call.arguments` | Yes      | Parameters passed to the tool.                  |
-| `action.tool_call.timestamp` | Yes      | When execution started (ISO 8601).              |
-| `action.tool_call.duration_ms` | No     | How long the tool took to execute.              |
-| `action.tool_call.output`    | Yes      | Raw output returned by the tool.                |
-| `action.tool_call.status`    | Yes      | Execution state: `success`, `error`, `timeout`. |
+| Attribute                      | Required | Description                                     |
+| :----------------------------- | :------- | :---------------------------------------------- |
+| `action.tool_call.id`          | Yes      | Unique identifier for this tool execution.      |
+| `action.tool_call.name`        | Yes      | Tool or command invoked.                        |
+| `action.tool_call.arguments`   | Yes      | Parameters passed to the tool.                  |
+| `action.tool_call.timestamp`   | Yes      | When execution started (ISO 8601).              |
+| `action.tool_call.duration_ms` | No       | How long the tool took to execute.              |
+| `action.tool_call.output`      | Yes      | Raw output returned by the tool.                |
+| `action.tool_call.status`      | Yes      | Execution state: `success`, `error`, `timeout`. |
 
 ### Target Attributes
 
@@ -252,7 +252,7 @@ All spans SHOULD include:
 | Attribute          | Required | Description                 |
 | :----------------- | :------- | :-------------------------- |
 | `experiment.name`  | Yes      | Experiment identifier       |
-| `agent.name`     | Yes      | Agent that created the span |
+| `agent.name`       | Yes      | Agent that created the span |
 | `experiment.phase` | Yes      | Current phase               |
 
 Action spans SHOULD also include:
@@ -290,16 +290,86 @@ agent.decision.*     (one reasoning cycle — what the agent decided to do)
 
 ### Agent Decision Attributes
 
-| Attribute                          | Required | Description                                                       |
-| :--------------------------------- | :------- | :---------------------------------------------------------------- |
-| `agent.decision.id`                | Yes      | Unique identifier for this decision record.                       |
+| Attribute                          | Required | Description                                                        |
+| :--------------------------------- | :------- | :----------------------------------------------------------------- |
+| `agent.decision.id`                | Yes      | Unique identifier for this decision record.                        |
 | `agent.decision.agent`             | Yes      | Agent that made this decision. References `agent.name` (RFC-0002). |
-| `agent.decision.timestamp`         | Yes      | When the decision was made (ISO 8601).                            |
-| `agent.decision.objective_ref`     | Yes      | RFC-0002 objective the agent was pursuing.                        |
-| `agent.decision.environment_state` | No       | Snapshot of relevant environment state at decision time.          |
-| `agent.decision.input`             | Yes      | What the agent observed before deciding.                          |
-| `agent.decision.cot`               | Yes      | Chain-of-Thought reasoning steps extracted from agent output.     |
-| `agent.decision.outcome`           | No       | Result of the decision cycle: `success`, `failure`, `aborted`.   |
+| `agent.decision.timestamp`         | Yes      | When the decision was made (ISO 8601).                             |
+| `agent.decision.objective_ref`     | Yes      | RFC-0002 objective the agent was pursuing.                         |
+| `agent.decision.environment_state` | No       | Snapshot of relevant environment state at decision time.           |
+| `agent.decision.input`             | Yes      | What the agent observed before deciding.                           |
+| `agent.decision.cot`               | Yes      | Chain-of-Thought reasoning steps extracted from agent output.      |
+| `agent.decision.outcome`           | No       | Result of the decision cycle: `success`, `failure`, `aborted`.     |
+
+---
+
+## Telemetry Tiering
+
+To balance storage constraints, performance overhead, and analytical depth, the observability schema enforces telemetry tiering. The `telemetry.tier` configuration dictates the verbosity of spans, the truncation of attributes, and the depth of agent reasoning records.
+
+The active tier is declared in the root telemetry configuration and propagated to all agents and collection points.
+
+### Tier Definitions
+
+The schema defines three standard telemetry tiers: `low`, `medium`, and `high`.
+
+| Tier     | Purpose                        | Target Use Case                                                 |
+| :------- | :----------------------------- | :-------------------------------------------------------------- |
+| `low`    | Outcome and objective focus    | CI/CD pass/fail, long-running simulations, basic scoring        |
+| `medium` | Execution and diagnostic focus | Default execution, purple team exercises, capability evaluation |
+| `high`   | Forensic and research focus    | AI safety research, RLHF datasets, absolute replayability       |
+
+### Attribute and Span Rules by Tier
+
+The active tier strictly controls what attributes and child spans are emitted during agent execution.
+
+| Element                        | Tier: `low`                     | Tier: `medium` (Default) | Tier: `high`                      |
+| :----------------------------- | :------------------------------ | :----------------------- | :-------------------------------- |
+| **`action.input`**             | Truncated (e.g., max 256 chars) | Included                 | Untruncated                       |
+| **`action.output`**            | Truncated (e.g., max 256 chars) | Included                 | Untruncated                       |
+| **`agent.decision.cot`**       | Omitted                         | Included                 | Included                          |
+| **`agent.decision.env_state`** | Omitted                         | Delta only               | Full snapshot                     |
+| **`action.tool_call.*` Spans** | Omitted                         | Included                 | Included                          |
+| **Raw Trace Artifacts**        | Omitted                         | Omitted                  | Included (refs to LLM API traces) |
+
+### Environment Event Volume
+
+The tier also dictates the volume of infrastructure and security events collected by the environment sinks.
+
+#### Tier: Low
+
+* **Agent Events:** Records top-level logical actions only (`action.started`, `action.completed`, `action.failed`).
+* **Infrastructure:** Captures major state changes (`environment.state_change`) and objective evaluations (`objective.achieved`, `objective.failed`).
+* **Security (Extension):** Limited to high-confidence detection alerts (`security.defense.alert`).
+
+#### Tier: Medium
+
+* **Agent Events:** Includes all tool invocation spans within logical actions.
+* **Infrastructure:** Collects standard environment logs (e.g., Syslog, Windows Security Events) mapped to OCSF.
+* **Security (Extension):** Enforces full correlation ID tracking (`trace_id`, `action_id`) across red team attacks and blue team detections.
+
+#### Tier: High
+
+* **Agent Events:** Captures all data.
+* **Infrastructure:** Enables dense collection points (e.g., `network_pcap` for packet capture).
+* **Security (Extension):** Captures comprehensive evidence artifacts, including full HTTP request/response bodies and raw file contents for forensic reconstruction.
+
+### Schema Implementation
+
+When declaring the active tier, telemetry configurations MUST specify the tier in the root telemetry attributes or schema reference:
+
+```yaml
+telemetry:
+  schema:
+    ref: "aces.io/schema/v1"
+    tier: medium
+    extensions: [security]
+```
+
+#### Tier Enforcement
+
+* **Agents (`aces-agent-sdk`):** MUST check the active tier to determine whether to emit `action.tool_call.*` child spans or truncate string attributes.
+* **Sinks (`aces-telemetry`):** MAY drop incoming events or spans that exceed the verbosity permitted by the active tier to enforce storage quotas.
 
 ---
 
@@ -583,7 +653,7 @@ applicable. Use the `otel.*` prefix for OTel-specific attributes.
 
 | ACES Attribute       | OTel Equivalent         |
 | :------------------- | :---------------------- |
-| `agent.name`       | `service.name`          |
+| `agent.name`         | `service.name`          |
 | `action.duration_ms` | `duration` (span field) |
 | `target.address`     | `net.peer.name`         |
 | `target.port`        | `net.peer.port`         |
@@ -604,7 +674,7 @@ Attributes can be mapped to ECS fields.
 
 | ACES Attribute        | ECS Equivalent     |
 | :-------------------- | :----------------- |
-| `agent.name`        | `agent.name`       |
+| `agent.name`          | `agent.name`       |
 | `target.address`      | `destination.ip`   |
 | `target.port`         | `destination.port` |
 | `credential.username` | `user.name`        |
