@@ -54,6 +54,7 @@ Fields across this schema are categorized by stability tier, which determines ho
 | `CapabilityType`       | growing         | `shell`, `tool`, `api`, `protocol`                                          |
 | `SourceType`           | growing         | `telemetry`, `local`, `api`                                                 |
 | `ModelProvider`        | growing         | `anthropic`, `openai`, `deepseek`, `xai`, `google`, `mistral`               |
+| `HarnessType`          | growing         | `claude_code`, `langchain`, `crewai`, `autogen`, `custom`                    |
 | `TrustLevel`           | extensible-enum | `trusted`, `untrusted`, `sandboxed`                                         |
 | `LogicalOperator`      | extensible-enum | `all`, `any`, `none`, `one`                                                 |
 
@@ -182,6 +183,7 @@ Agents are defined as a map keyed by name (the unique identifier).
 | `display_name`  | String     | No       | Human-readable label.               | `Research Agent`                          |
 | `type`          | AgentType  | Yes      | Agent paradigm.                     | see [Type Definitions](#type-definitions) |
 | `goal`          | String     | Yes      | Natural language objective.         | `Analyze and report findings`             |
+| `harness`       | Object     | No       | Agent framework/runtime.            | See Harness                               |
 | `model`         | Object     | No       | LLM configuration (for llm/hybrid). | See Model                                 |
 | `knowledge`     | Object     | No       | Reference materials for the agent.  | See Knowledge                             |
 | `observation`   | Object     | No       | What the agent can perceive.        | See Observation                           |
@@ -203,6 +205,23 @@ Agents are defined as a map keyed by name (the unique identifier).
 | `scripted` | Deterministic playbook execution                  |
 | `hybrid`   | Combination (e.g., LLM reasoning + RL components) |
 | `human`    | Human-in-the-loop participant                     |
+
+### Harness
+
+The agent harness is the framework or runtime that orchestrates agent behavior —
+managing tool calls, context, retries, and the interaction loop between the model
+and the environment. The same model through different harnesses (e.g., Claude Code
+vs. LangChain vs. a custom script) produces materially different behavior.
+
+`harness` is distinct from `model`: the model is the LLM, the harness is the
+software driving it. For `scripted` or `rl` agents that have no LLM, `harness`
+captures the execution framework without requiring a `model` block.
+
+| Property  | Type        | Required | Description                              | Example                          |
+| :-------- | :---------- | :------- | :--------------------------------------- | :------------------------------- |
+| `type`    | HarnessType | Yes      | Framework type.                          | `claude_code`, `langchain`       |
+| `version` | String      | No       | Framework version for reproducibility.   | `1.2.0`                          |
+| `config`  | Object      | No       | Harness-specific key-value configuration.| `{system_prompt: ./prompt.md}`   |
 
 ### Model
 
@@ -352,6 +371,11 @@ agents:
     labels:
       team: red
       phase: recon
+    harness:
+      type: claude_code
+      version: "1.2.0"
+      config:
+        system_prompt: ./prompts/recon-agent.md
     model:
       provider: anthropic
       name: claude-sonnet-4-20250514
@@ -764,6 +788,9 @@ agents:
     display_name: "Explorer Agent"
     type: llm
     goal: "Explore the environment and identify all server endpoints."
+    harness:
+      type: claude_code
+      version: "1.2.0"
     model:
       provider: anthropic
       name: claude-sonnet-4-20250514
@@ -792,6 +819,11 @@ agents:
     type: llm
     goal: "Analyze exploration results and create a comprehensive report."
     depends_on: [explorer]
+    harness:
+      type: langchain
+      version: "0.3.0"
+      config:
+        chain_type: react
     model:
       provider: anthropic
       name: claude-sonnet-4-20250514

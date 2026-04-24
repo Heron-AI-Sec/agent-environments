@@ -176,6 +176,7 @@ specification defines what a Run record MUST contain for reproducibility.
 | `scenario`         | Object        | Yes      | Scenario name and pinned version.                | `{name: ad-recon, version: 1.0.0}` |
 | `experiment`       | Object        | Yes      | Experiment name and pinned version.              | `{name: ad-recon-exp, version: 1.0.0}` |
 | `environment`      | Object        | Yes      | Environment name and pinned version.             | `{name: ad-lab, version: 1.0.0}` |
+| `agents`           | Array         | Yes      | Agent snapshots from this run.                   | See Agent Snapshot               |
 | `backend`          | Object        | Yes      | Runtime backend that executed the run.           | See Backend                      |
 | `reset_strategy`   | ResetStrategy | Yes      | Strategy used for this run.                      | `reprovision`                    |
 | `outcome`          | RunOutcome    | Yes      | Run outcome.                                     | `success`                        |
@@ -185,6 +186,20 @@ specification defines what a Run record MUST contain for reproducibility.
 | `results`          | Object        | No       | Objective outcomes and final score from RFC-0002.| `{score: 85.0, objectives: {}}` |
 | `cost`             | Object        | No       | Cost of this run.                                | See Cost                         |
 | `labels`           | Object        | No       | Arbitrary key-value labels.                      | `{run_by: researcher-a}`         |
+
+### Agent Snapshot
+
+Records the agent configuration used during this run. This is a pin of
+the RFC-0002 agent definition at execution time — not a re-specification.
+The snapshot captures enough to identify and reproduce the agent without
+duplicating the full RFC-0002 schema.
+
+| Property  | Type   | Required | Description                                   | Example                  |
+| :-------- | :----- | :------- | :-------------------------------------------- | :----------------------- |
+| `name`    | String | Yes      | Agent name (key from RFC-0002 agents map).    | `explorer`               |
+| `type`    | String | Yes      | Agent type from RFC-0002.                     | `llm`                    |
+| `harness` | Object | No       | Harness type and version (from RFC-0002).     | `{type: claude_code, version: 1.2.0}` |
+| `model`   | Object | No       | Model provider, name, and version (from RFC-0002). | `{provider: anthropic, name: claude-sonnet-4-20250514}` |
 
 ### Backend
 
@@ -220,6 +235,23 @@ experiment:
 environment:
   name: ad-lab
   version: "1.0.0"
+agents:
+  - name: explorer
+    type: llm
+    harness:
+      type: claude_code
+      version: "1.2.0"
+    model:
+      provider: anthropic
+      name: claude-sonnet-4-20250514
+  - name: analyzer
+    type: llm
+    harness:
+      type: langchain
+      version: "0.3.0"
+    model:
+      provider: anthropic
+      name: claude-sonnet-4-20250514
 backend:
   name: aces-runtime-prod
   type: kubernetes
