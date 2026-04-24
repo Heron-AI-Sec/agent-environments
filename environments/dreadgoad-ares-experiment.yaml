@@ -51,6 +51,12 @@ agents:
       team: red
       role: orchestrator
       ares.component: orchestrator
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: orchestrator
     model:
       provider: openai
       name: gpt-5.2
@@ -122,6 +128,12 @@ agents:
       ares.component: worker
       mitre_tactic: TA0007
       mitre_techniques: "T1046,T1087,T1069,T1018,T1135"
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: worker
     model:
       provider: openai
       name: gpt-5.2
@@ -174,6 +186,12 @@ agents:
       ares.component: worker
       mitre_tactic: TA0006
       mitre_techniques: "T1003,T1558,T1552,T1555"
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: worker
     model:
       provider: openai
       name: gpt-5.2
@@ -225,6 +243,12 @@ agents:
       ares.component: worker
       mitre_tactic: TA0006
       mitre_techniques: "T1110"
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: worker
     model:
       provider: openai
       name: gpt-5.2
@@ -271,6 +295,12 @@ agents:
       ares.component: worker
       mitre_tactic: TA0004
       mitre_techniques: "T1134,T1222,T1484"
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: worker
     model:
       provider: openai
       name: gpt-5.2
@@ -320,6 +350,12 @@ agents:
       ares.component: worker
       mitre_tactic: TA0004
       mitre_techniques: "T1649,T1134,T1068"
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: worker
     model:
       provider: openai
       name: gpt-5.2
@@ -373,6 +409,12 @@ agents:
       ares.component: worker
       mitre_tactic: TA0008
       mitre_techniques: "T1021,T1550,T1563"
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: worker
     model:
       provider: openai
       name: gpt-5.2
@@ -429,6 +471,12 @@ agents:
       ares.component: worker
       mitre_tactic: TA0006
       mitre_techniques: "T1557,T1187"
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: worker
     model:
       provider: openai
       name: gpt-5.2
@@ -478,6 +526,12 @@ agents:
       team: blue
       role: orchestrator
       ares.component: blue-orchestrator
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: blue-orchestrator
     model:
       provider: openai
       name: gpt-5.2
@@ -530,6 +584,12 @@ agents:
       team: blue
       role: triage
       ares.component: blue-worker
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: blue-worker
     model:
       provider: openai
       name: gpt-5.2
@@ -576,6 +636,12 @@ agents:
       team: blue
       role: threat_hunter
       ares.component: blue-worker
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: blue-worker
     depends_on: [blue-triage]
     model:
       provider: openai
@@ -625,6 +691,12 @@ agents:
       team: blue
       role: lateral_analyst
       ares.component: blue-worker
+    harness:
+      type: custom
+      version: "2.0.0"
+      config:
+        framework: ares
+        component: blue-worker
     depends_on: [blue-threat-hunter]
     model:
       provider: openai

@@ -382,9 +382,12 @@ edges:
     dst_type: Domain
     severity: info
     classification: structural
+    conditions:
+      requires_auth: false
     meta:
       trust_direction: bidirectional
       trust_type: external
+      mitre_technique_id: T1134.005
 
   - edge_id: trust-sk-north
     type: ParentOf
@@ -394,6 +397,113 @@ edges:
     dst_type: Domain
     severity: info
     classification: structural
+    conditions:
+      requires_auth: false
+
+  # --------------------------------------------------------------------------
+  # Structural: Domain Membership (Contains / MemberOf)
+  # --------------------------------------------------------------------------
+  # Hosts contained in domains
+  - edge_id: sk-contains-kingslanding
+    type: Contains
+    src: domain-sevenkingdoms
+    dst: host-kingslanding
+    src_type: Domain
+    dst_type: Host
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: north-contains-winterfell
+    type: Contains
+    src: domain-north
+    dst: host-winterfell
+    src_type: Domain
+    dst_type: Host
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: essos-contains-meereen
+    type: Contains
+    src: domain-essos
+    dst: host-meereen
+    src_type: Domain
+    dst_type: Host
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: north-contains-castelblack
+    type: Contains
+    src: domain-north
+    dst: host-castelblack
+    src_type: Domain
+    dst_type: Host
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: essos-contains-braavos
+    type: Contains
+    src: domain-essos
+    dst: host-braavos
+    src_type: Domain
+    dst_type: Host
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  # Principals as members of Domain Admins groups
+  - edge_id: cersei-memberof-da-sk
+    type: MemberOf
+    src: principal-cersei
+    dst: principal-da-sevenkingdoms
+    src_type: Principal
+    dst_type: Principal
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  # CA contained in domains
+  - edge_id: sk-contains-ca-kingslanding
+    type: Contains
+    src: domain-sevenkingdoms
+    dst: ca-kingslanding
+    src_type: Domain
+    dst_type: CertificateAuthority
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: essos-contains-ca-meereen
+    type: Contains
+    src: domain-essos
+    dst: ca-meereen
+    src_type: Domain
+    dst_type: CertificateAuthority
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: essos-contains-ca-braavos
+    type: Contains
+    src: domain-essos
+    dst: ca-braavos
+    src_type: Domain
+    dst_type: CertificateAuthority
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
 
   # --------------------------------------------------------------------------
   # Kerberos: Property Edges (Enumeration Targets)
@@ -406,6 +516,8 @@ edges:
     dst_type: Principal
     severity: low
     classification: property
+    conditions:
+      requires_auth: false
     meta:
       mitre_technique_id: T1558.004
 
@@ -417,6 +529,8 @@ edges:
     dst_type: Principal
     severity: low
     classification: property
+    conditions:
+      requires_auth: true
     meta:
       mitre_technique_id: T1558.003
 
@@ -428,6 +542,8 @@ edges:
     dst_type: Principal
     severity: low
     classification: property
+    conditions:
+      requires_auth: true
     meta:
       mitre_technique_id: T1558.003
 
@@ -439,6 +555,8 @@ edges:
     dst_type: Principal
     severity: low
     classification: property
+    conditions:
+      requires_auth: true
 
   - edge_id: svc-mssql-essos-spn
     type: HasSPNConfigured
@@ -448,6 +566,8 @@ edges:
     dst_type: Principal
     severity: low
     classification: property
+    conditions:
+      requires_auth: true
 
   # --------------------------------------------------------------------------
   # Credential Chain: Roasting → Cracking → Authentication
@@ -460,6 +580,8 @@ edges:
     dst_type: Credential
     severity: info
     classification: credential
+    conditions:
+      requires_auth: false
 
   - edge_id: jon-asrep-crackable
     type: CanCrack
@@ -482,6 +604,8 @@ edges:
     dst_type: Credential
     severity: info
     classification: credential
+    conditions:
+      requires_auth: true
 
   - edge_id: robb-tgs-crackable
     type: CanCrack
@@ -502,6 +626,8 @@ edges:
     dst_type: Credential
     severity: info
     classification: credential
+    conditions:
+      requires_auth: true
 
   - edge_id: khal-tgs-crackable
     type: CanCrack

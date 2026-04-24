@@ -45,6 +45,38 @@ topology:
         aws.subnet_type: private
         purpose: ad-hosts
 
+  edges:
+    # Network segment connectivity
+    - src: goad-vpc
+      dst: goad-private
+      type: contains
+      description: "GOAD private subnet is within the VPC"
+    # Host-level network edges (flat L2 within goad-private)
+    - src: kingslanding
+      dst: winterfell
+      type: l2_adjacent
+      conditions:
+        latency: <1ms
+        bandwidth: 10Gbps
+    - src: kingslanding
+      dst: meereen
+      type: l2_adjacent
+      conditions:
+        latency: <1ms
+        bandwidth: 10Gbps
+    - src: winterfell
+      dst: meereen
+      type: l2_adjacent
+      conditions:
+        latency: <1ms
+        bandwidth: 10Gbps
+    - src: castelblack
+      dst: braavos
+      type: l2_adjacent
+      conditions:
+        latency: <1ms
+        bandwidth: 10Gbps
+
   nodes:
     # ------------------------------------------------------------------
     # Domain Controllers
