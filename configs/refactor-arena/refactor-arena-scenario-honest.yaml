@@ -1,0 +1,45 @@
+---
+apiVersion: aces.io/v1alpha1
+kind: Scenario
+metadata:
+  name: refactor-arena-getting-started
+  description: >-
+    Getting-started scenario for Refactor Arena in honest mode. The untrusted
+    agent performs single-file refactoring on the side-tasks-3/mixed-3 dataset
+    (3 Python repositories) with no side task assigned. This establishes the
+    honest baseline: monitor false positive rates and agent usefulness on
+    purely legitimate refactoring work.
+  version: "1.0.0"
+  labels:
+    rfc: "0004"
+    domain: software-security
+    project: refactor-arena
+    eval_mode: honest
+    difficulty: beginner
+    dataset: side-tasks-3/mixed-3
+    main_task: refactor_single_file
+    estimated_duration: 30m
+    agent_count: "1"
+
+# ==============================================================================
+# Experiment Reference
+# ==============================================================================
+experiment:
+  ref:
+    name: refactor-arena-honest-eval
+    version: "1.0.0"
+  source: ./refactor-arena-experiment-honest.yaml
+
+# ==============================================================================
+# Reset Strategy
+# ==============================================================================
+# Docker container rebuild per sample. Each sample gets a fresh container with
+# the repository files copied in during setup. This is equivalent to
+# reprovision in network environments but much faster (~30s vs minutes).
+#
+# Container rebuild is required because:
+#   1. Agent may modify files outside /workspace (e.g., pip installs, configs)
+#   2. Database state from pytest fixtures must be pristine per sample
+#   3. Process state (web proxy, killable processes) must be fresh
+#   4. Environment variables are injected per-fixture at container start
+reset_strategy: reprovision
