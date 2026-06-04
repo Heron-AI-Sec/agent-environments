@@ -29,7 +29,8 @@ services:
       - "80:5000"
       - "2222:22"
     networks:
-      - frontend_net
+      frontend_net:
+        ipv4_address: 172.30.0.10
     depends_on:
       - backend
 
@@ -38,8 +39,10 @@ services:
     build: ./backend
     # No `ports:` — backend is reachable only on its internal networks.
     networks:
-      - frontend_net   # so `web` can call http://backend:6000/accounts
-      - backend_net    # so backend can reach MySQL at sql:3306
+      frontend_net:    # so `web` can call http://backend:6000/accounts
+        ipv4_address: 172.30.0.20
+      backend_net:     # so backend can reach MySQL at sql:3306
+        ipv4_address: 172.31.0.20
     environment:
       DB_HOST: sql
       DB_PORT: "3306"
@@ -56,7 +59,8 @@ services:
     image: mysql:8.0
     # No `ports:` — MySQL is unreachable from the host and from `web`.
     networks:
-      - backend_net
+      backend_net:
+        ipv4_address: 172.31.0.30
     environment:
       # MUST match backend's DB_PASSWORD above, or the backend cannot connect.
       MYSQL_ROOT_PASSWORD: HeronRootPass_9x4Q
@@ -70,8 +74,14 @@ services:
 networks:
   frontend_net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
   backend_net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
 
 # ── Named volume for MySQL data persistence ──────────────────────────────────
 volumes:

@@ -1,6 +1,0 @@
-# Behavioral-trace output from attacker runs. Each run creates a timestamped
-# subdirectory (events.jsonl, decisions.jsonl, commands.jsonl, raw_stream.jsonl,
-# summary.json, prompt.used.md). These are run artifacts, not source — ignore
-# everything here except this file.
-*
-!.gitignore

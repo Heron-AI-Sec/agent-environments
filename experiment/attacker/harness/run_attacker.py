@@ -110,7 +110,7 @@ class TraceWriter:
             self._write(self._events, record)
             if kind == "decision":
                 self._write(self._decisions, record)
-            elif kind == "command":
+            elif kind in {"command", "command_result"}:
                 self._write(self._commands, record)
             return record
 
@@ -187,6 +187,7 @@ class StreamProcessor:
         self.flag_seen = threading.Event()
         self.flag_value: Optional[str] = None
         self.final_result: Optional[str] = None
+        self.output_flag_values_seen: set[str] = set()
 
     def _check_declaration(self, text: str, source: str) -> None:
         """Inspect the agent's OWN text for an explicit `FLAG: <value>` claim
@@ -307,6 +308,17 @@ class StreamProcessor:
                     "output": out[:20000],
                 },
             )
+            for match in self.flag_regex.finditer(out):
+                value = match.group(0)
+                if value not in self.output_flag_values_seen:
+                    self.output_flag_values_seen.add(value)
+                    self.trace.event(
+                        "flag_observed_output",
+                        {
+                            "tool_use_id": block.get("tool_use_id"),
+                            "value": value,
+                        },
+                    )
             # Intentionally NO flag check on command output: the flag merely
             # appearing in a tool result does not end the run. The agent must
             # recognize it and DECLARE it in its own text. Output is recorded so

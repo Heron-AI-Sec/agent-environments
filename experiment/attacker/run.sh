@@ -2,18 +2,19 @@
 # =============================================================================
 # One-command runner for a black-box attack trial against Attack_me_1.
 #
-# ⚠️ Research use only — run inside an isolated/disposable host.
+# Research use only - run inside an isolated/disposable host.
 #
 # What it does:
 #   1. Reprovisions the testbed (down -v && up --build -d) for a clean run,
 #      satisfying scenario.yaml `reset_strategy: reprovision`.
 #   2. Builds + runs the attacker container attached to frontend_net only.
 #   3. The harness records every decision + command and HARD STOPS on the FLAG.
-#   4. Prints the run summary and where the trace lives.
+#   4. Captures target-service logs alongside the attacker trace.
+#   5. Prints the run summary and where the trace lives.
 #
 # Requirements:
 #   * docker + compose v2
-#   * ANTHROPIC_API_KEY exported (or mount a ~/.claude credential — see
+#   * ANTHROPIC_API_KEY exported (or mount a ~/.claude credential - see
 #     docker-compose.attacker.yml).
 #
 # Usage:
@@ -25,8 +26,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Resolve the testbed-app docker-compose.yml relative to this dir:
-# attacker -> attack_me_1 -> experiment_def -> experiment -> experiment_app
-ROOT_COMPOSE="$(cd "${HERE}/../../../experiment_app/" && pwd)/docker-compose.yml"
+# attacker -> experiment -> experiment_app
+ROOT_COMPOSE="$(cd "${HERE}/../experiment_app/" && pwd)/docker-compose.yml"
 ATTACKER_COMPOSE="${HERE}/docker-compose.attacker.yml"
 
 if [[ ! -f "${ROOT_COMPOSE}" ]]; then
@@ -52,34 +53,42 @@ compose() {
 mkdir -p "${HERE}/runs"
 
 for ((i = 1; i <= N_TRIALS; i++)); do
+  run_id="$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%04x%04x' "$((RANDOM % 65536))" "$((RANDOM % 65536))")"
+  run_dir="${HERE}/runs/${run_id}"
+  mkdir -p "${run_dir}"
+
   echo "=============================================================="
-  echo "[run.sh] Trial ${i}/${N_TRIALS} — reprovisioning testbed"
+  echo "[run.sh] Trial ${i}/${N_TRIALS} - reprovisioning testbed"
   echo "=============================================================="
-  # Full reset for reproducibility (scenario.yaml reset_strategy: reprovision).
   compose down -v --remove-orphans || true
   compose up --build -d web backend sql
 
   echo "[run.sh] Waiting for web ingress to come up..."
   sleep 5
 
+  echo "[run.sh] Capturing web/backend/sql logs to ${run_dir}/services.log"
+  compose logs -f --no-color web backend sql > "${run_dir}/services.log" 2>&1 &
+  logs_pid=$!
+
   echo "[run.sh] Launching black-box attacker (foreground)..."
-  # Run the attacker in the foreground so we see the live narration; the
-  # harness exits 0 on flag capture, 1 otherwise.
   set +e
-  compose run --rm --build attacker
+  RUN_ID="${run_id}" compose run --rm --build attacker
   rc=$?
   set -e
 
+  kill "${logs_pid}" 2>/dev/null || true
+  wait "${logs_pid}" 2>/dev/null || true
+
   echo "[run.sh] Attacker exited rc=${rc} (0 = FLAG captured)."
-  latest="$(ls -1dt "${HERE}/runs"/*/ 2>/dev/null | head -n1 || true)"
-  if [[ -n "${latest}" && -f "${latest}summary.json" ]]; then
+  if [[ -f "${run_dir}/summary.json" ]]; then
     echo "[run.sh] Summary for trial ${i}:"
-    cat "${latest}summary.json"
+    cat "${run_dir}/summary.json"
     echo
-    echo "[run.sh] Trace dir: ${latest}"
-    echo "[run.sh]   decisions -> ${latest}decisions.jsonl"
-    echo "[run.sh]   commands  -> ${latest}commands.jsonl"
-    echo "[run.sh]   timeline  -> ${latest}events.jsonl"
+    echo "[run.sh] Trace dir: ${run_dir}/"
+    echo "[run.sh]   decisions -> ${run_dir}/decisions.jsonl"
+    echo "[run.sh]   commands  -> ${run_dir}/commands.jsonl"
+    echo "[run.sh]   timeline  -> ${run_dir}/events.jsonl"
+    echo "[run.sh]   services  -> ${run_dir}/services.log"
   fi
 done
 

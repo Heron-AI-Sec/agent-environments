@@ -12,19 +12,26 @@ testbed in the ACES definition language (the RFCs under
 
 ## What is and isn't modelled yet
 
-We have built the **infrastructure** and mapped its **attack surface**. We have
-**not** built an attacker agent or run any experiment. So:
+We now have the **infrastructure**, the **security overlay**, a runnable
+**black-box attacker experiment**, and an **observed run trace** reconstructed
+from `trial-001`. So:
 
 | File | RFC | Models | Status |
 |------|-----|--------|--------|
 | [`environment.yaml`](environment.yaml) | RFC-0001 | "What exists": the `web`, `backend`, `sql` containers, the two bridge networks (`frontend_net`, `backend_net`), services, ports, and telemetry. | **Complete** |
 | [`security.yaml`](security.yaml) | RFC-0005 | The security-domain layer: schema-exact `Credential` objects (kind + CredentialPolicy) and `AttackRelationship` edges for the parts of the chain that map to the taxonomy. | **Partial by design** — see fit caveat below. |
-| [`experiment.yaml`](experiment.yaml) | RFC-0002 | "What happens": the attacker agent, objectives, and runtime. | **Placeholder** — empty `agents: {}`; no agent built yet. |
-| [`scenario.yaml`](scenario.yaml) | RFC-0004 | Named execution unit + reset strategy. | **Placeholder** — references the stub experiment; not runnable yet. |
+| [`experiment.yaml`](experiment.yaml) | RFC-0002 | "What happens": the attacker agent, objectives, and runtime. | **Runnable** — black-box Claude Code attacker with observer-side success termination and full decision/command trace capture. |
+| [`scenario.yaml`](scenario.yaml) | RFC-0004 | Named execution unit + reset strategy. | **Runnable** — reprovisions the environment between trials. |
+| [`agent_trace.yaml`](agent_trace.yaml) | Auxiliary run trace | Ordered description of what the attacker actually did in `trial-001`, tied to log evidence and attacker runtime context. | **Observed run (non-RFC auxiliary)** |
 
-The placeholder files (`v0.0.0`) exist only to mark where the experiment will go
-once an attacker agent is designed. They deliberately leave "what happens"
-unspecified.
+The design sketch in `docs/DESIGN.md` proposed an `agent_trace.yaml`; that file
+now exists here as a concrete, log-backed run description rather than a stub.
+It is intentionally kept as an **auxiliary analysis artifact**, not presented
+as a formal ACES resource, because the current RFC set does not define an
+`agent_trace` kind.
+The formal RFC-0004 runtime artifact is a **Run record**; `trial-001` currently
+survives as JSONL logs plus this reconstructed auxiliary trace rather than as a
+runtime-emitted RFC-0004 Run object.
 
 ### RFC compliance status (honest)
 
@@ -36,8 +43,12 @@ unspecified.
   `EdgeConditions`, `EdgeMeta` limited to `mitre_technique_id`, `Credential`,
   `CredentialPolicy`). It is **not** an `apiVersion/kind` resource because
   RFC-0005 defines a domain of types, not a top-level resource kind.
-- **`experiment.yaml`/`scenario.yaml`** use only RFC-0002 / RFC-0004 fields and
-  are intentional placeholders (`agents: {}`).
+- **`experiment.yaml`/`scenario.yaml`** now use only RFC-0002 / RFC-0004 fields
+  for a runnable black-box attacker setup; `agent_trace.yaml` is a local
+  run-description file derived from logs rather than an RFC resource.
+- **`environment.yaml`** now declares the RFC-0001 `agent_platform` explicitly,
+  and its telemetry schema now declares RFC-0003 tier `high`, matching the
+  forensic / AI-safety intent of the experiment.
 
 ### RFC-0005 fit caveat (important for the AI-safety goal)
 
@@ -64,21 +75,23 @@ experiment well; RFC-0005 is a partial fit and should not be over-stretched.**
 ## How the layers fit together
 
 ```
-RFC-0004 scenario.yaml      (placeholder: reset strategy)
+RFC-0004 scenario.yaml      (reprovisioned trial wrapper)
         │ references
         ▼
-RFC-0002 experiment.yaml    (placeholder: no agent yet)
+RFC-0002 experiment.yaml    (runnable black-box attacker)
         │ environment.ref
         ▼
 RFC-0001 environment.yaml   ◄── overlaid by ──  RFC-0005 security.yaml
    (containers, networks)                       (attack graph, secrets, vulns)
+        │
+        └── observed by ──> agent_trace.yaml   (concrete trial-001 action trace)
 ```
 
 - **RFC-0001** defines *what exists* — the topology and telemetry.
 - **RFC-0005** overlays the *security domain* — the exploitable relationships,
   credential artifacts, and vulnerabilities, referencing RFC-0001 nodes by name.
-- **RFC-0002** (placeholder) will define *what happens* — the agent and goals.
-- **RFC-0004** (placeholder) wraps the experiment into a reproducible run unit.
+- **RFC-0002** defines *what happens* — the attacker, goal, and stopping rule.
+- **RFC-0004** wraps the experiment into a reproducible run unit.
 
 ## Mapping to the testbed
 
@@ -102,3 +115,9 @@ RFC-0001 environment.yaml   ◄── overlaid by ──  RFC-0005 security.yaml
   `mitre_technique_id`); no other metadata keys are used.
 - The `[security]` telemetry extension is enabled in `environment.yaml` so a
   future attacker trace can carry MITRE / `attack.*` attributes (RFC-0003 §16).
+
+## Observed Run Trace
+
+The directory now also includes a concrete run-level YAML trace:
+
+- [`agent_trace.yaml`](agent_trace.yaml) records the observed `trial-001` attack path, tied back to the attacker runtime environment and the JSONL logs in [`../../attacker/runs/trial-001/`](../../attacker/runs/trial-001/).

@@ -1,0 +1,9 @@
+# Behavioral-trace output from attacker runs. Each run creates a subdirectory
+# (events.jsonl, decisions.jsonl, commands.jsonl, raw_stream.jsonl,
+# summary.json, prompt.used.md). These are run artifacts, not source, so ignore
+# everything here except this file and the curated baseline trace we want in
+# the repo.
+*
+!.gitignore
+!trial-001/
+!trial-001/**
