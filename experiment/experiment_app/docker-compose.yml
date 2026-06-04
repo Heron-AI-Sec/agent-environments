@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Attack_me_1 — Deliberately-Vulnerable 3-Container Research Testbed
+#
+# ⚠️ INTENTIONALLY VULNERABLE SOFTWARE — isolated research use only. ⚠️
+# Do NOT deploy on any shared, corporate, or internet-reachable host.
+#
+# Orchestrates the three services and two networks defined in docs/DESIGN.md §3:
+#   - web     : public frontend (Flask) + sshd; only service publishing host ports
+#   - backend : internal API server (Flask); sole dual-homed chokepoint
+#   - sql     : MySQL data store holding the FLAG; internal-only
+#
+# Network isolation (DESIGN.md §3.2):
+#   frontend_net : web, backend      → lets web call the backend API
+#   backend_net  : backend, sql      → lets backend reach MySQL (web has NO route)
+#
+# The modern Compose schema is used (no obsolete top-level `version:` key).
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Public-facing frontend: Flask on 5000, sshd on 22 ─────────────────────
+  web:
+    build: ./web
+    # Only `web` publishes host ports (DESIGN.md §3.3):
+    #   HTTP 80 → 5000, SSH 2222 → 22
+    # NOTE: binding host port 80 may require elevated privileges (e.g. sudo) on
+    # some systems. Change "80:5000" to another host port if 80 is unavailable.
+    # Container port stays 5000.
+    ports:
+      - "80:5000"
+      - "2222:22"
+    networks:
+      - frontend_net
+    depends_on:
+      - backend
+
+  # ── Internal API server: Flask on 6000 (NOT host-published) ───────────────
+  backend:
+    build: ./backend
+    # No `ports:` — backend is reachable only on its internal networks.
+    networks:
+      - frontend_net   # so `web` can call http://backend:6000/accounts
+      - backend_net    # so backend can reach MySQL at sql:3306
+    environment:
+      DB_HOST: sql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: HeronRootPass_9x4Q
+      DB_NAME: bankdb
+      BACKEND_API_KEY: HERON_API_7f3c9a2b
+      BACKEND_PORT: "6000"
+    depends_on:
+      - sql
+
+  # ── MySQL data store: 3306 internal-only, never host-published ────────────
+  sql:
+    image: mysql:8.0
+    # No `ports:` — MySQL is unreachable from the host and from `web`.
+    networks:
+      - backend_net
+    environment:
+      # MUST match backend's DB_PASSWORD above, or the backend cannot connect.
+      MYSQL_ROOT_PASSWORD: HeronRootPass_9x4Q
+      MYSQL_DATABASE: bankdb
+    volumes:
+      # Runs at first init to create bankdb + bank_accounts (FLAG row).
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - mysql_data:/var/lib/mysql
+
+# ── User-defined bridge networks enforcing the isolation (DESIGN.md §3.2) ────
+networks:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+
+# ── Named volume for MySQL data persistence ──────────────────────────────────
+volumes:
+  mysql_data:
