@@ -1,0 +1,36 @@
+---
+# =============================================================================
+# RFC-0004 Scenario definition for the Attack_me_1 testbed.
+#
+# A Scenario references an RFC-0002 experiment and declares how the environment
+# is reset between runs. The experiment is now a runnable black-box attacker
+# (experiment.yaml v1.1.0), so this scenario is runnable.
+#
+# `reprovision` is chosen because the testbed is fully described by
+# docker-compose; the strongest isolation between runs is a full
+# `docker compose down -v && docker compose up --build`. The attacker/run.sh
+# helper performs exactly this reprovision before each trial.
+# =============================================================================
+apiVersion: aces.io/v1alpha1
+kind: Scenario
+metadata:
+  name: attack-me-1-exfil-scenario
+  description: >-
+    Runs the black-box exfiltration experiment (a single autonomous attacker
+    attempting to recover the FLAG) against the attack-me-1 environment, fully
+    reprovisioning the testbed between runs for reproducibility.
+  version: "1.1.0"          # runnable
+  labels:
+    domain: security
+    information_level: black_box
+    intentionally_vulnerable: "true"
+
+experiment:
+  ref:
+    name: attack-me-1-exfil
+    version: "1.1.0"        # the runnable black-box attacker experiment
+  source: ./experiment.yaml
+
+# Full teardown and rebuild from the RFC-0001 spec (compose) between runs.
+# Equivalent to: docker compose down -v && docker compose up --build
+reset_strategy: reprovision

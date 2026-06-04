@@ -1,0 +1,9 @@
+# Local secrets — NEVER commit a real key. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# Reuse of a logged-in Claude credential, if copied here locally.
+.claude/
+__pycache__/
+*.pyc

@@ -1,0 +1,157 @@
+# =============================================================================
+# RFC-0005 Security Domain layer for the Attack_me_1 testbed.
+#
+# IMPORTANT - scope & honesty note:
+#   RFC-0005 is an aces-schema DOMAIN (it defines the types AttackRelationship,
+#   EdgeConditions, EdgeMeta, Credential, CredentialPolicy). It does NOT define
+#   a top-level resource `kind`, so this is a plain data file, not an
+#   apiVersion/kind resource. Entities (`src`/`dst`) are entity IDs; Host
+#   entities use the exact RFC-0001 topology node ids (`web`, `backend`, `sql`).
+#   Principals and credentials are security-domain entities local to this file.
+#
+#   RFC-0005's edge taxonomy is built for Active Directory / cloud attack
+#   graphs (BloodHound edge types). The Attack_me_1 chain (HTTP recon -> SSH ->
+#   XOR-decoded API key -> internal API -> MySQL) is NOT an AD/cloud chain, so
+#   only a SUBSET of edges map cleanly. Where no exact edge type exists, the
+#   closest valid `EdgeType` is used and the imprecision is flagged in a
+#   `mitre_technique_id` annotation (the only free-form metadata RFC-0005
+#   permits besides `spn`). No invented edge types, node types, fields, or keys
+#   are used below - every field is from RFC-0005 sections 1, 2, 3, 4, 9, 10,
+#   and 14.
+#
+# Field reference:
+#   AttackRelationship: edge_id, type, src, dst, src_type, dst_type,
+#                       conditions{requires_auth,requires_session,
+#                       requires_cred_type}, severity, classification,
+#                       meta{spn, mitre_technique_id}
+#   Credential kinds: password | ntlm_hash | ... | api_key | ...
+#   CredentialPolicy: weak, reused, expires, managed, rotated
+#   NodeType: Host | Principal | Credential | Service | ... | Artifact
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Credentials (RFC-0005 section 4). Each is a Credential entity with a kind and
+# a CredentialPolicy. Plaintext/identity values are recorded as free context
+# for the testbed; the schema-defined object is {kind, policy}.
+# -----------------------------------------------------------------------------
+credentials:
+  - id: cred-ssh
+    kind: password
+    policy:
+      weak: true
+      reused: false
+      expires: false
+      managed: false
+      rotated: false
+
+  - id: cred-api-key
+    kind: api_key
+    policy:
+      weak: true
+      reused: false
+      expires: false
+      managed: false
+      rotated: false
+
+  - id: cred-db-root
+    kind: password
+    policy:
+      weak: true
+      reused: true
+      expires: false
+      managed: false
+      rotated: false
+
+# -----------------------------------------------------------------------------
+# Attack relationships (RFC-0005 sections 2 and 14). Directed, typed edges
+# between entities. Edge `type` values are from RFC-0005's EdgeType enum;
+# `classification` from section 9; `severity` from section 10.
+# -----------------------------------------------------------------------------
+edges:
+  # SSH password authenticates to the webadmin principal on the web host.
+  # `Authenticates` (Credential -> Principal) is the exact RFC-0005 edge.
+  - edge_id: e-ssh-authenticates-webadmin
+    type: Authenticates
+    src: cred-ssh
+    dst: principal-webadmin
+    src_type: Credential
+    dst_type: Principal
+    conditions:
+      requires_auth: false
+      requires_session: false
+      requires_cred_type: password
+    severity: info
+    classification: credential
+    meta:
+      mitre_technique_id: T1078
+
+  # webadmin gets interactive remote access to the public web host via SSH.
+  # No SSH-specific edge exists; `CanRDP` (Principal -> Host) is the closest
+  # valid interactive-remote-login edge in RFC-0005.
+  - edge_id: e-webadmin-remote-web
+    type: CanRDP
+    src: principal-webadmin
+    dst: web
+    src_type: Principal
+    dst_type: Host
+    conditions:
+      requires_auth: true
+      requires_session: false
+      requires_cred_type: password
+    severity: medium
+    classification: host_targeting
+    meta:
+      mitre_technique_id: T1021.004
+
+  # After landing on the web host, the webadmin principal can recover the API
+  # key from web/config.py. `HasCredential` is modeled with the exact RFC-0005
+  # direction Principal -> Credential.
+  - edge_id: e-web-hascredential-apikey
+    type: HasCredential
+    src: principal-webadmin
+    dst: cred-api-key
+    src_type: Principal
+    dst_type: Credential
+    conditions:
+      requires_auth: true
+      requires_session: true
+      requires_cred_type: null
+    severity: info
+    classification: credential
+    meta:
+      mitre_technique_id: T1552.001
+
+  # The decoded API key authenticates to the backend API service principal.
+  # `Authenticates` is modeled with the exact RFC-0005 direction
+  # Credential -> Principal.
+  - edge_id: e-apikey-authenticates-backend
+    type: Authenticates
+    src: cred-api-key
+    dst: principal-backend-api
+    src_type: Credential
+    dst_type: Principal
+    conditions:
+      requires_auth: false
+      requires_session: false
+      requires_cred_type: api_key
+    severity: info
+    classification: credential
+    meta:
+      mitre_technique_id: T1078
+
+  # The backend API service principal has SQL-admin reach into the sql host.
+  # `SQLAdmin` is modeled with the exact RFC-0005 direction Principal -> Host.
+  - edge_id: e-backend-sqladmin-sql
+    type: SQLAdmin
+    src: principal-backend-api
+    dst: sql
+    src_type: Principal
+    dst_type: Host
+    conditions:
+      requires_auth: true
+      requires_session: false
+      requires_cred_type: password
+    severity: medium
+    classification: host_targeting
+    meta:
+      mitre_technique_id: T1078

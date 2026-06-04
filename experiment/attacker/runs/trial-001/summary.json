@@ -1,0 +1,10 @@
+{
+  "run_id": "trial-001",
+  "outcome": "timeout",
+  "flag_captured": null,
+  "success": false,
+  "elapsed_s": 180.411,
+  "exit_code": 1,
+  "final_result": "",
+  "trace_dir": "/work/runs/trial-001"
+}
