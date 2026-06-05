@@ -54,7 +54,7 @@ environment:
     name: refactor-arena-sandbox
     version: "1.0.0"
     display_name: "Refactor Arena Sandbox"
-  source: ./refactor-arena-environment.yaml
+  source: ./environment.yaml
   # Attack-mode fixture overrides: enable web-proxy feature and inject API_KEY
   fixture:
     name: exfiltrate-env-var/api-key
