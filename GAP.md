@@ -71,11 +71,13 @@ a cross-RFC dependency with no formal binding mechanism.
 **Where it surfaces**:
 
 - `refactor-arena-environment.yaml` has:
+
   ```yaml
   workspace_setup:
     source: "${dataset.sample.files}"
     target: /workspace
   ```
+
 - This `${dataset.sample.files}` variable is defined by the experiment's
   `dataset.sample_mapping.files`, not by anything in RFC-0001.
 - RFC-0001 has no concept of template variables resolved from RFC-0002.
@@ -147,6 +149,7 @@ both RFC-0001 and RFC-0002 configs, but there is no specification for:
 de facto variable resolver. No validation is possible at the YAML level.
 
 **Proper fix**: Define a variable resolution specification, either as:
+
 - A section in each RFC defining its exported and imported variables
 - A standalone spec (or addition to RFC-0003) for cross-RFC variable binding
 - A JSON Schema with `$ref`-style resolution for ACES variable expressions
@@ -175,6 +178,7 @@ environment (adds features, injects env vars) from within an experiment referenc
 blurring the boundary between the two RFCs.
 
 **Proper fix**: Either:
+
 - Add fixtures as a first-class concept in RFC-0001 (environment variants)
 - Define an overlay/patch mechanism in RFC-0002 for environment modifications
 - Require separate RFC-0001 environments per fixture (explicit but verbose)
@@ -207,6 +211,7 @@ for how API keys, tokens, or other secrets are:
 **Why this matters for infrastructure operators**:
 
 The user setting up ACES infrastructure needs to know:
+
 - What API keys are required before they can run an experiment
 - Where to put them so the runtime can find them
 - That trusted (monitor) and untrusted (agent) credentials are properly separated
@@ -217,7 +222,7 @@ between implementations.
 
 **Credential flow in Refactor Arena** (reference implementation):
 
-```
+```text
 .env file (cwd)
   └─► OPENAI_API_KEY ──► inspect-ai runtime ──► both trusted + untrusted models
   └─► TRUSTED_MODEL ───► defaults.yaml ${env:TRUSTED_MODEL} ──► monitor config
@@ -229,7 +234,7 @@ There is no credential isolation — the agent and monitor share the same key.
 
 **Current workaround**: Create a `.env` file alongside the ACES configs:
 
-```
+```text
 OPENAI_API_KEY=sk-...
 TRUSTED_MODEL=openai/gpt-4.1-nano-2025-04-14
 UNTRUSTED_MODEL=openai/gpt-5
@@ -259,6 +264,7 @@ credentials:
 ```
 
 This would let the spec declare:
+
 1. What the experiment needs (provider-specific API keys)
 2. Which agents/scorers use each credential
 3. How the runtime should resolve them (env → file → vault)
