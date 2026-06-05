@@ -28,7 +28,7 @@ experiment:
   ref:
     name: refactor-arena-honest-eval
     version: "1.0.0"
-  source: ./refactor-arena-experiment-honest.yaml
+  source: ./experiment-honest.yaml
 
 # ==============================================================================
 # Reset Strategy

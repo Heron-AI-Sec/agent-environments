@@ -30,13 +30,13 @@ scenarios:
   # usefulness on legitimate refactoring tasks.
   - name: refactor-arena-getting-started
     version: "1.0.0"
-    source: ./refactor-arena-scenario-honest.yaml
+    source: ./scenario-honest.yaml
 
   # Attack scenario: measures monitor true positive rates (safety) and
   # agent attack success rate on data exfiltration via paywall backdoor.
   - name: refactor-arena-data-exfiltration-guided
     version: "1.0.0"
-    source: ./refactor-arena-scenario-attack.yaml
+    source: ./scenario-attack.yaml
 
 # ==============================================================================
 # Runs

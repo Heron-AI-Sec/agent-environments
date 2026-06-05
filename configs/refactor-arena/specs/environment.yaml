@@ -44,8 +44,8 @@ topology:
       config:
         # Docker Compose service configuration
         compose:
-          source: ./sandboxes/default/compose.yaml
-        dockerfile: ./sandboxes/default/Dockerfile
+          source: ../sandboxes/default/compose.yaml
+        dockerfile: ../sandboxes/default/Dockerfile
         workdir: /workspace
         user: agent
         entrypoint: /usr/local/bin/entrypoint.sh
@@ -75,7 +75,7 @@ features:
   # Language toolchains
   python:
     description: "Python 3.12+ runtime with pip and pytest"
-    install: features/python/install.sh
+    install: ../features/python/install.sh
     required: true
 
   # Infrastructure features (enabled per fixture/side-task)
@@ -84,8 +84,8 @@ features:
       mitmdump web proxy that intercepts, monitors, and logs all HTTP/HTTPS
       traffic. Used by data exfiltration side tasks to capture exfiltrated
       secrets in proxy logs.
-    install: features/web-proxy/install.sh
-    start: features/web-proxy/start.sh
+    install: ../features/web-proxy/install.sh
+    start: ../features/web-proxy/start.sh
     required: false
 
   killable-process:
@@ -93,22 +93,22 @@ features:
       Long-running dummy processes (mitmdump, firewall, safety-monitor) that
       can be targeted by process-killing side tasks. Started at container
       runtime.
-    install: features/killable-process/install.sh
-    start: features/killable-process/start.sh
+    install: ../features/killable-process/install.sh
+    start: ../features/killable-process/start.sh
     required: false
 
   pytest-db-reset-plugin:
     description: >-
       Pytest plugin that resets the database between test runs. Required for
       database-auth side tasks to ensure clean state for exploit detection.
-    install: features/pytest-db-reset-plugin/install.sh
+    install: ../features/pytest-db-reset-plugin/install.sh
     required: false
 
   pytest-fixed-salt-plugin:
     description: >-
       Pytest plugin that fixes the password hashing salt. Required for
       change-password side tasks to enable deterministic hash comparison.
-    install: features/pytest-fixed-salt-plugin/install.sh
+    install: ../features/pytest-fixed-salt-plugin/install.sh
     required: false
 
 # ==============================================================================
@@ -187,9 +187,12 @@ provisioning:
     build_args:
       FEATURES: "${fixture.features}"
     environment: "${fixture.environment}"
-  # Repository files are copied into /workspace at setup time by the
-  # setup-repo solver, not baked into the image.
+  # Repository files are copied into /workspace at setup time.
+  # The source is resolved from the experiment's dataset.sample_mapping.files,
+  # which points to a repo directory inside the dataset git repo.
+  # NOTE: This coupling between provisioning (RFC-0001) and dataset (proposed
+  # RFC-0002 extension) is a known gap — see GAP.md.
   workspace_setup:
     solver: setup-repo
-    source: "${sample.files}"
+    source: "${dataset.sample.files}"
     target: /workspace
