@@ -1,0 +1,9 @@
+.venv/
+.env
+.dataset-cache/
+datasets/
+experiment-workspace/
+workspace/
+results/
+logs/
+__pycache__/
