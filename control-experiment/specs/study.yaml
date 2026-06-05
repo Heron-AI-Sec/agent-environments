@@ -140,19 +140,16 @@ scoring_criteria:
 # ==============================================================================
 # Cost Tracking
 # ==============================================================================
+# GAP: RFC-0004 Study Cost schema defines total, unit, and per_run only.
+# Budget estimation (budget_per_run, budget_per_study) is not part of the
+# spec. Consider adding a `budget` field to RFC-0004 Study for pre-run
+# cost planning.
+#
+# Estimated costs for reference:
+#   Per run: ~$3.25 (LLM API untrusted $2.50, monitors $0.50, compute $0.25)
+#   Small study (3 samples × 2 modes × 2 models): ~$39
+#   Large study (100 samples × 2 modes × 6 models): ~$3,900
 cost:
   unit: usd
-  # Estimated per-run cost breakdown
-  budget_per_run:
-    llm_api_untrusted: 2.50   # ~1 agent × 10M token budget
-    llm_api_monitors: 0.50    # 2 monitors × 1 call each (cheap model)
-    compute_infra: 0.25       # 1 Docker container × ~30min
-    total_estimated: 3.25
-  # Per-sample cost is low; the study cost scales with dataset size × models
-  # Example: 100 samples × 6 models × 2 modes = 1200 runs × $3.25 = ~$3,900
-  budget_per_study:
-    small_dataset: 39.00      # 3 samples × 2 modes × 2 models
-    large_dataset: 3900.00    # 100 samples × 2 modes × 6 models
-  # Aggregate tracking populated after runs
   total: 0.0
   per_run: {}

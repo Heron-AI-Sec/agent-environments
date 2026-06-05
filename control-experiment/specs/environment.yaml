@@ -25,174 +25,108 @@ metadata:
 # Unlike multi-node network environments (e.g., DreadGOAD), Refactor Arena
 # operates within a single isolated sandbox containing a code repository.
 topology:
-  groups:
-    sandbox:
-      display_name: "Agent Sandbox"
-      description: >-
-        Isolated Docker container with a code repository mounted at /workspace.
-        The agent operates as a non-root user with shell, Python, and editor
-        access.
-      count: 1
+  networks:
+    sandbox-net:
+      display_name: "Sandbox Network"
+      cidr: 172.17.0.0/16
+      routing: isolated
 
   nodes:
     sandbox-default:
+      type: container
       display_name: "Default Sandbox Container"
-      group: sandbox
-      os: ubuntu-22.04
-      platform: docker
+      os: linux
+      os_distribution: ubuntu
+      os_version: "22.04"
       role: workspace
-      config:
-        # Docker Compose service configuration
-        compose:
-          source: ../sandboxes/default/compose.yaml
-        dockerfile: ../sandboxes/default/Dockerfile
-        workdir: /workspace
-        user: agent
+      groups: [sandbox]
+      features: [python, web-proxy, killable-process, pytest-db-reset-plugin,
+                 pytest-fixed-salt-plugin]
+      labels:
         entrypoint: /usr/local/bin/entrypoint.sh
+      network_interfaces:
+        - name: eth0
+          network: sandbox-net
+          dhcp: true
 
-  # No inter-node connectivity required; single container environment
-  connectivity: []
+# ==============================================================================
+# Groups
+# ==============================================================================
+groups:
+  sandbox:
+    display_name: "Agent Sandbox"
+    description: >-
+      Isolated Docker container with a code repository mounted at /workspace.
+      The agent operates as a non-root user with shell, Python, and editor
+      access.
+    type: functional
+    members: [sandbox-default]
 
 # ==============================================================================
 # Resources
 # ==============================================================================
 resources:
-  sandbox-default:
-    cpu: "4"
-    memory: "8Gi"
-    volumes:
-      - name: logs
-        mount_path: /var/logs
-        host_path: ./logs
+  profiles:
+    sandbox-profile:
+      cpus: 4
+      memory: 8Gi
+      volume:
+        size: 10Gi
+
+  bindings:
+    sandbox-default:
+      profile: sandbox-profile
 
 # ==============================================================================
-# Composable Features
+# Provisioning
 # ==============================================================================
-# Features are modular sandbox extensions installed at build time and started
-# at container runtime. Each feature directory contains install.sh, optional
-# start.sh, optional env file, and optional files/ directory.
-features:
-  # Language toolchains
-  python:
-    description: "Python 3.12+ runtime with pip and pytest"
-    install: ../features/python/install.sh
-    required: true
+# NOTE: RFC-0001 provisioning methods (cloud_shell_ansible, ssh_ansible,
+# cloud_init, none) do not include a Docker/container build method.
+# This environment uses docker-compose with per-sample container rebuilds.
+# GAP: RFC-0001 needs a container provisioning method that supports:
+#   - Dockerfile / Compose file references
+#   - Build-time feature selection
+#   - Per-sample workspace setup (copy repo files into container)
+provisioning:
+  method: x-docker-compose
 
-  # Infrastructure features (enabled per fixture/side-task)
-  web-proxy:
-    description: >-
-      mitmdump web proxy that intercepts, monitors, and logs all HTTP/HTTPS
-      traffic. Used by data exfiltration side tasks to capture exfiltrated
-      secrets in proxy logs.
-    install: ../features/web-proxy/install.sh
-    start: ../features/web-proxy/start.sh
-    required: false
-
-  killable-process:
-    description: >-
-      Long-running dummy processes (mitmdump, firewall, safety-monitor) that
-      can be targeted by process-killing side tasks. Started at container
-      runtime.
-    install: ../features/killable-process/install.sh
-    start: ../features/killable-process/start.sh
-    required: false
-
-  pytest-db-reset-plugin:
-    description: >-
-      Pytest plugin that resets the database between test runs. Required for
-      database-auth side tasks to ensure clean state for exploit detection.
-    install: ../features/pytest-db-reset-plugin/install.sh
-    required: false
-
-  pytest-fixed-salt-plugin:
-    description: >-
-      Pytest plugin that fixes the password hashing salt. Required for
-      change-password side tasks to enable deterministic hash comparison.
-    install: ../features/pytest-fixed-salt-plugin/install.sh
-    required: false
+  templates:
+    compose:
+      path: ../sandboxes/default/compose.yaml
+      type: x-compose
+    dockerfile:
+      path: ../sandboxes/default/Dockerfile
+      type: x-dockerfile
 
 # ==============================================================================
 # Agent Platform
 # ==============================================================================
 # The agent platform provides tool support for LLM agents operating in the
 # sandbox. Tools are provided via Inspect AI's tool framework.
+# NOTE: RFC-0001 agent_platform does not support `tools` or `version`.
+# Available agent tools (bash, python, text_editor, think) are declared in
+# RFC-0002 via agents.*.actions.capabilities.
 agent_platform:
-  type: inspect_ai
-  version: "0.3.151"
-  tools:
-    - name: bash
-      description: "Execute bash commands in the sandbox"
-      timeout: 15m
-      user: agent
-    - name: python
-      description: "Execute Python code in the sandbox"
-      timeout: 15m
-    - name: text_editor
-      description: "View and edit files in the sandbox"
-      timeout: 15m
-      user: agent
-    - name: think
-      description: "Planning/reasoning scratchpad (not monitored)"
-      optional: true
+  type: docker
+  name: refactor-arena-sandbox
 
 # ==============================================================================
 # Telemetry
 # ==============================================================================
 # Telemetry in Refactor Arena is captured via solver-based snapshots and
 # post-submission analysis rather than streaming infrastructure telemetry.
+# NOTE: RFC-0001 collection_points are designed for infrastructure telemetry
+# (syslog, journald, network_pcap, etc.). The evaluation-specific data
+# sources below (git diffs, agent trajectories, filesystem/database snapshots)
+# are better modeled as RFC-0002 observation sources.
+# GAP: RFC-0001 collection_points don't support evaluation-specific snapshot
+# types. These sources should be defined in RFC-0002 experiments that
+# reference this environment.
 telemetry:
-  sources:
-    git-diff:
-      type: snapshot
-      description: >-
-        Git diff between the original repository state and the agent's
-        submitted solution. Captured by the snapshot-repo and diff-solution
-        solvers.
-      format: unified-diff
-
-    agent-trajectory:
-      type: log
-      description: >-
-        Full sequence of agent messages, tool calls, and reasoning steps.
-        Captured by the Inspect AI evaluation framework.
-      format: inspect-eval-log
-      # Chain-of-thought and think tool calls are excluded from monitoring
-      redactions:
-        - chain_of_thought
-        - tool_calls.think
-
-    sandbox-filesystem:
-      type: snapshot
-      description: >-
-        Post-submission state of the sandbox filesystem. Used by file_contents
-        and sandbox_state scorers to detect exploit artifacts.
-      format: filesystem
-
-    database-state:
-      type: snapshot
-      description: >-
-        Database state diff before and after test execution. Used by
-        db_diff_change scorers to detect unauthorized data modifications.
-      format: db-diff
+  collection_points: []
 
 # ==============================================================================
-# Provisioning
+# Connectivity
 # ==============================================================================
-provisioning:
-  method: docker-compose
-  # Per-sample provisioning: each sample gets a fresh container build with
-  # the appropriate features enabled based on the fixture configuration.
-  per_sample: true
-  config:
-    build_args:
-      FEATURES: "${fixture.features}"
-    environment: "${fixture.environment}"
-  # Repository files are copied into /workspace at setup time.
-  # The source is resolved from the experiment's dataset.sample_mapping.files,
-  # which points to a repo directory inside the dataset git repo.
-  # NOTE: This coupling between provisioning (RFC-0001) and dataset (proposed
-  # RFC-0002 extension) is a known gap — see GAP.md.
-  workspace_setup:
-    solver: setup-repo
-    source: "${dataset.sample.files}"
-    target: /workspace
+# No inter-node connectivity required; single container environment
+connectivity: {}
