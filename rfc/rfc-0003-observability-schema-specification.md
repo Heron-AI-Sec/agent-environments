@@ -205,7 +205,7 @@ Specific event types within categories.
 | `environment.state_change`  | Environment state modified  |
 | `environment.node_event`    | Event from environment node |
 | `environment.network_event` | Network-level event         |
-| `environment.inject`        | Inject executed             |
+| `environment.intervention`  | Runtime intervention executed |
 
 #### Objective Events (`objective.*`)
 
