@@ -46,8 +46,20 @@ def db_reset():
     _reset_database()
 PLUGIN
 
-# Install by symlinking into site-packages (available after python feature)
-SITE_PACKAGES=$(python3 -c "import site; print(site.getsitepackages()[0])" 2>/dev/null || echo "/usr/lib/python3/dist-packages")
-ln -sf /opt/pytest-plugins/pytest_db_reset.py "$SITE_PACKAGES/pytest_db_reset.py" 2>/dev/null || true
+# This feature depends on the python feature's venv. Fail loudly if it is
+# missing rather than silently symlinking into the wrong (system) interpreter
+# where the plugin would never load. In an eval harness a silent no-op is far
+# worse than a hard build failure.
+VENV_DIR="${VIRTUAL_ENV:-/opt/venv}"
+if [ ! -x "$VENV_DIR/bin/python" ]; then
+    echo "ERROR: pytest-db-reset-plugin requires the 'python' feature (venv at $VENV_DIR not found)." >&2
+    echo "       List 'python' before this feature in FEATURES." >&2
+    exit 1
+fi
 
-echo "[pytest-db-reset-plugin] Feature installed successfully."
+# Resolve the venv's site-packages strictly (no dist-packages fallback) and
+# install the plugin there. No '|| true' — a failed symlink must abort.
+SITE_PACKAGES=$("$VENV_DIR/bin/python" -c "import site; print(site.getsitepackages()[0])")
+ln -sf /opt/pytest-plugins/pytest_db_reset.py "$SITE_PACKAGES/pytest_db_reset.py"
+
+echo "[pytest-db-reset-plugin] Linked into ${SITE_PACKAGES}."

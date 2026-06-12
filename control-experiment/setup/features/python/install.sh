@@ -1,43 +1,43 @@
 #!/usr/bin/env bash
-# Feature: python — Install Python 3.12+, pip, pytest, and common dev tools.
+# Feature: python — Provision Python 3.12 tooling in an isolated virtualenv.
+#
+# On Ubuntu 24.04 (Noble) python3 is already 3.12, so we do NOT add the
+# deadsnakes PPA and we never repoint /usr/bin/python3 (apt and system tooling
+# depend on the stock interpreter). Instead we build a dedicated venv at
+# ${VIRTUAL_ENV:-/opt/venv}, which the Dockerfile puts first on PATH. All pip
+# packages are version-pinned so the eval image builds reproducibly.
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get update
-apt-get install -y --no-install-recommends \
-    gpg \
-    curl \
-    ca-certificates
+VENV_DIR="${VIRTUAL_ENV:-/opt/venv}"
 
-# Add deadsnakes PPA via signed-by keyring (modern method, avoids add-apt-repository GPG issues)
-curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF23C5A6CF475977595C89F51BA6932366A755776" \
-    | gpg --dearmor -o /etc/apt/keyrings/deadsnakes.gpg
-
-echo "deb [signed-by=/etc/apt/keyrings/deadsnakes.gpg] http://ppa.launchpad.net/deadsnakes/ppa/ubuntu jammy main" \
-    > /etc/apt/sources.list.d/deadsnakes.list
+# Pinned versions for reproducible eval builds.
+PIP_VERSION="24.3.1"
+PYTEST_VERSION="8.3.4"
+PYTEST_TIMEOUT_VERSION="2.3.1"
+BLACK_VERSION="24.10.0"
+RUFF_VERSION="0.8.4"
 
 apt-get update
 apt-get install -y --no-install-recommends \
-    python3.12 \
-    python3.12-venv \
-    python3.12-dev
+    python3 \
+    python3-venv \
+    python3-dev
 
-# Bootstrap pip for 3.12 via ensurepip
-python3.12 -m ensurepip --upgrade
+# Create the venv from the stock 3.12 interpreter; leave /usr/bin/python3 alone.
+python3 -m venv "$VENV_DIR"
 
-# Make python3.12 the default python3 / python
-update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
-update-alternatives --install /usr/bin/python  python  /usr/bin/python3.12 1
-
-# Upgrade pip and install common dev tools
-python3.12 -m pip install --no-cache-dir --break-system-packages \
-    pip --upgrade
-python3.12 -m pip install --no-cache-dir --break-system-packages \
-    pytest \
-    pytest-timeout \
-    black \
-    ruff
+# Use the venv's pip explicitly so this works regardless of PATH state. We do
+# NOT pass --no-cache-dir: the Dockerfile mounts a BuildKit pip cache, which
+# lives outside the image layer, so reusing it speeds rebuilds without bloating
+# the final image.
+"$VENV_DIR/bin/pip" install "pip==${PIP_VERSION}"
+"$VENV_DIR/bin/pip" install \
+    "pytest==${PYTEST_VERSION}" \
+    "pytest-timeout==${PYTEST_TIMEOUT_VERSION}" \
+    "black==${BLACK_VERSION}" \
+    "ruff==${RUFF_VERSION}"
 
 rm -rf /var/lib/apt/lists/*
-echo "[python] Feature installed successfully."
+echo "[python] venv ready at ${VENV_DIR} (python $("${VENV_DIR}/bin/python" -V))"
