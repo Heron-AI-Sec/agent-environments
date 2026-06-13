@@ -50,7 +50,7 @@ Fields across this schema are categorized by stability tier, which determines ho
 | `RestartPolicy`        | extensible-enum | `never`, `on_failure`                                                       |
 | `CommunicationPattern` | extensible-enum | `streaming`, `batch`, `direct`, `blackboard`                                |
 | `ConditionType`        | growing         | `state`, `event`, `metric`, `artifact`, `agent_status`, `elapsed`, `custom` |
-| `InjectType`           | growing         | `event`, `state`, `message`, `artifact`, `delay`                            |
+| `InterventionType`     | growing         | `event`, `state`, `message`, `artifact`, `delay`, `custom`                  |
 | `CapabilityType`       | growing         | `shell`, `tool`, `api`, `protocol`                                          |
 | `SourceType`           | growing         | `telemetry`, `local`, `api`                                                 |
 | `ModelProvider`        | growing         | `anthropic`, `openai`, `deepseek`, `xai`, `google`, `mistral`               |
@@ -76,7 +76,7 @@ Fields across this schema are categorized by stability tier, which determines ho
 | `environment` | Reference to RFC-0001 infrastructure                                  |
 | `agents`      | Autonomous entities that interact with environment and other entities |
 | `objectives`  | Success criteria and scoring                                          |
-| `injects`     | Scripted events injected during execution                             |
+| `interventions` | Runtime-orchestrated changes, stimuli, or messages                 |
 | `runtime`     | Execution configuration: phases, throttling, state                    |
 
 ---
@@ -91,7 +91,7 @@ Fields across this schema are categorized by stability tier, which determines ho
 | `environment` | Object | Yes      | Reference to RFC-0001 environment.     | `{ref: {name: ...}}`           |
 | `agents`      | Object | Yes      | Agent definitions (map keyed by name). | `{agent-1: {...}}`             |
 | `objectives`  | Object | No       | Success criteria (map keyed by name).  | `{goal-1: {...}}`              |
-| `injects`     | Object | No       | Scripted events (map keyed by name).   | `{event-1: {...}}`             |
+| `interventions` | Object | No     | Runtime interventions (map keyed by name). | `{notify-1: {...}}`        |
 | `runtime`     | Object | No       | Execution configuration.               | `{timeout: 4h, phases: {}}`    |
 
 ### Example
@@ -563,93 +563,134 @@ objectives:
 
 ---
 
-## Injects
+## Interventions
 
-Injects are scripted events injected during experiment execution. They provide
-stimuli, simulate external events, or set up specific conditions.
+`inject` is overloaded in cybersecurity and can be mistaken for exploit
+classes like SQL injection or command injection. This RFC therefore uses
+`interventions` for runtime-orchestrated behavior: the harness or evaluator
+causes something to happen in response to a trigger.
 
-Injects are defined as a map keyed by name (the unique identifier).
+Interventions are defined as a map keyed by name (the unique identifier).
 
-| Property       | Type       | Required | Description            | Example                                   |
-| :------------- | :--------- | :------- | :--------------------- | :---------------------------------------- |
-| `display_name` | String     | No       | Human-readable label.  | `External Trigger`                        |
-| `description`  | String     | No       | Detailed description.  | `Simulates...`                            |
-| `type`         | InjectType | Yes      | Inject type.           | see [Type Definitions](#type-definitions) |
-| `target`       | String     | No       | Target node or agent.  | `server-01`, `agent-1`                    |
-| `payload`      | Object     | Yes      | Type-specific payload. | See below                                 |
-| `timing`       | Object     | No       | When to execute.       | See Timing                                |
+Each intervention separates:
 
-### Inject Types
+- `trigger`: when the intervention fires
+- `action`: what the runtime does when it fires
 
-| Type       | Description                 | Payload Fields        |
-| :--------- | :-------------------------- | :-------------------- |
-| `event`    | Emit event to telemetry     | `event_type`, `data`  |
-| `state`    | Modify environment state    | `target`, `mutation`  |
-| `message`  | Send message to agent       | `content`, `channel`  |
-| `artifact` | Place file in environment   | `path`, `content`     |
-| `delay`    | Pause execution             | `duration`            |
-| `custom`   | Custom inject via evaluator | `evaluator`, `params` |
+This makes statements like "after the agent connects to `db-01`, place a file
+on `web-01`" explicit in the schema instead of burying timing inside an
+injection primitive.
 
-#### Custom Injects
+| Property       | Type   | Required | Description                         | Example                        |
+| :------------- | :----- | :------- | :---------------------------------- | :----------------------------- |
+| `display_name` | String | No       | Human-readable label.               | `Notify On Connection`         |
+| `description`  | String | No       | Detailed description.               | `Simulates...`                 |
+| `trigger`      | Object | Yes      | When the intervention should fire.  | See Trigger                    |
+| `action`       | Object | Yes      | What the runtime should do.         | See Action                     |
 
-For inject types not covered above, use `type: custom` with an evaluator:
+### Trigger
+
+The trigger block answers "when should this happen?"
+
+| Property    | Type   | Required | Description                                      | Example                      |
+| :---------- | :----- | :------- | :----------------------------------------------- | :--------------------------- |
+| `condition` | Object | No       | Condition-based trigger using the condition DSL. | `{type: event, ...}`         |
+| `phase`     | String | No       | Phase in which this trigger is evaluated.        | `execution`                  |
+| `at`        | String | No       | Absolute time into experiment.                   | `10m`                        |
+| `after`     | String | No       | Fire after another intervention completes.       | `setup-data`                 |
+| `delay`     | String | No       | Delay after the matched trigger.                 | `30s`                        |
+| `on`        | String | No       | Phase transition shorthand: `enter` or `exit`.   | `enter`                      |
+
+At least one of `condition`, `phase` + `on`, `at`, or `after` should be set.
+
+> **Note:** `at` is relative to experiment start time. Use `condition` when the
+> trigger should depend on observed runtime behavior, such as an
+> `environment.node_event` indicating an SSH or database connection.
+
+### Action
+
+The action block answers "what should the runtime do?"
+
+| Property  | Type             | Required | Description                           | Example                                   |
+| :-------- | :--------------- | :------- | :------------------------------------ | :---------------------------------------- |
+| `type`    | InterventionType | Yes      | Intervention action type.             | see [Type Definitions](#type-definitions) |
+| `target`  | String           | No       | Target node or agent.                 | `server-01`, `agent-1`                    |
+| `payload` | Object           | Yes      | Type-specific action payload.         | See below                                 |
+
+### Intervention Action Types
+
+| Type       | Description                        | Payload Fields        |
+| :--------- | :--------------------------------- | :-------------------- |
+| `event`    | Emit event to telemetry            | `event_type`, `data`  |
+| `state`    | Modify environment state           | `mutation`            |
+| `message`  | Send message to agent              | `content`, `channel`  |
+| `artifact` | Place file or artifact             | `path`, `content`     |
+| `delay`    | Pause or gate execution            | `duration`            |
+| `custom`   | Custom evaluator-defined behavior  | `evaluator`, `params` |
+
+#### Custom Interventions
+
+For actions not covered above, use `action.type: custom` with an evaluator:
 
 ```yaml
-injects:
+interventions:
   run-custom-script:
-    type: custom
-    payload:
-      evaluator: my_custom_inject
-      params:
-        command: "bash /tmp/setup.sh"
-        target: server-01
+    trigger:
+      phase: setup
+      on: enter
+    action:
+      type: custom
+      target: server-01
+      payload:
+        evaluator: my_custom_intervention
+        params:
+          command: "bash /tmp/setup.sh"
 ```
 
-### Timing
-
-| Property | Type   | Required | Description                    | Example       |
-| :------- | :----- | :------- | :----------------------------- | :------------ |
-| `phase`  | String | No       | Phase to execute during.       | `exploration` |
-| `delay`  | String | No       | Delay after trigger.           | `30s`         |
-| `at`     | String | No       | Absolute time into experiment. | `10m`         |
-| `after`  | String | No       | Execute after another inject.  | `inject-1`    |
-
-> **Note:** `at` is relative to experiment start time. Use `on_enter`/`on_exit` on phases when you need an inject tied to a phase transition rather than an absolute time. For example, `timing.at: 0m` fires at the start of the experiment, while `on_enter` fires when that specific phase begins, which may be well into the experiment.
-
-### Injects Example
+### Interventions Example
 
 ```yaml
-injects:
+interventions:
   trigger-event:
     display_name: "External Trigger"
-    type: event
-    payload:
-      event_type: external_update
-      data:
-        message: "New data available"
-    timing:
+    trigger:
       phase: execution
-      delay: 5m
+      at: 5m
+    action:
+      type: event
+      payload:
+        event_type: external_update
+        data:
+          message: "New data available"
 
   setup-artifact:
     display_name: "Setup Test Data"
-    type: artifact
-    target: server-01
-    payload:
-      path: /data/input.json
-      content: '{"test": true}'
-    timing:
+    trigger:
       phase: setup
+      on: enter
+    action:
+      type: artifact
+      target: server-01
+      payload:
+        path: /data/input.json
+        content: '{"test": true}'
 
-  notify-agent:
-    display_name: "Notify Analyzer"
-    type: message
-    target: analyzer
-    payload:
-      content: "Begin analysis"
-      channel: commands
-    timing:
-      after: trigger-event
+  after-db-connect-notify:
+    display_name: "Notify Analyzer After DB Connection"
+    trigger:
+      condition:
+        type: event
+        event_type: environment.node_event
+        filter:
+          protocol: ssh
+          destination: db-01
+      delay: 10s
+    action:
+      type: message
+      target: analyzer
+      payload:
+        content: "The agent connected to db-01. Begin follow-up analysis."
+        channel: commands
 ```
 
 ---
@@ -680,8 +721,8 @@ Phases are defined as a map keyed by name (the unique identifier).
 | `start_agents` | Array  | No       | Agents to start.                   | `[explorer]`        |
 | `stop_agents`  | Array  | No       | Agents to stop.                    | `[setup-agent]`     |
 | `wait_for`     | String | No       | Objective to wait for.             | `milestone-reached` |
-| `on_enter`     | Array  | No       | Injects to trigger on phase start. | `[setup-inject]`    |
-| `on_exit`      | Array  | No       | Injects to trigger on phase end.   | `[cleanup]`         |
+| `on_enter`     | Array  | No       | Interventions to trigger on phase start. | `[setup-artifact]` |
+| `on_exit`      | Array  | No       | Interventions to trigger on phase end.   | `[cleanup]`        |
 
 ### Throttling
 
@@ -875,18 +916,19 @@ objectives:
           expr: "objectives.report-generated.achieved"
     reward: 100.0
 
-injects:
+interventions:
   mid-experiment-event:
     display_name: "New Data Available"
-    type: event
-    payload:
-      event_type: data_update
-      data:
-        source: external
-        message: "Additional endpoints added"
-    timing:
+    trigger:
       phase: exploration
-      delay: 15m
+      at: 15m
+    action:
+      type: event
+      payload:
+        event_type: data_update
+        data:
+          source: external
+          message: "Additional endpoints added"
 
 runtime:
   timeout: 2h

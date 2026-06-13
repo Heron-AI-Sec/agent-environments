@@ -49,6 +49,9 @@ The following shared types are referenced throughout this specification.
 | `Role` | growing | `server`, `workstation`, `router`, `database`, `web`, `domain_controller`, `gateway`, `dns_server`, `mail_server`, `file_server` |
 | `Provisioner` | growing | `terraform`, `ansible`, `docker`, `proxmox`, `cloud_init` |
 | `CollectionType` | growing | `syslog`, `journald`, `file`, `kubernetes_logs`, `otel_spans`, `metrics`, `events`, `windows_security`, `network_pcap` |
+| `LootKind` | growing | `credential_material`, `token`, `key_material`, `source_code`, `repository`, `document`, `email`, `database_record`, `api_response`, `archive`, `dataset` |
+| `LootReferenceType` | growing | `file`, `directory`, `repository`, `database`, `email`, `api`, `service`, `web_content`, `memory`, `object_storage` |
+| `Representation` | growing | `plaintext`, `encoded`, `obfuscated`, `encrypted`, `hashed`, `derived`, `composite` |
 
 **Note:** Scenario-specific roles (`attacker`, `target`, `c2_server`, `redirector`, etc.)
 belong in RFC-0002 (Experiment Specification), not here. Infrastructure roles describe
@@ -66,6 +69,7 @@ what a node *is*; scenario roles describe what a node *does* in a specific exper
 | Section          | Purpose                                                              |
 |:-----------------|:---------------------------------------------------------------------|
 | `topology`       | Logical structure of networks, nodes, and edges                      |
+| `loot`           | Scenario-significant artifacts that exist in the environment         |
 | `groups`         | Logical grouping of nodes by role, function, or deployment           |
 | `resources`      | Infrastructure bindings, compute profiles, and image configuration   |
 | `provisioning`   | Post-deployment configuration and automation                         |
@@ -83,6 +87,7 @@ what a node *is*; scenario roles describe what a node *does* in a specific exper
 | `kind`           | String | Yes      | Resource type.                                 | `Environment`                   |
 | `metadata`       | Object | Yes      | Identifying information.                       | `{name, description, version}`  |
 | `topology`       | Object | Yes      | Logical definition of networks, nodes, edges.  | `{networks: {}, nodes: {}}`     |
+| `loot`           | Object | No       | Catalog of scenario-significant artifacts.     | `{api_key: {...}}`              |
 | `groups`         | Object | No       | Logical grouping of nodes.                     | `{servers: {...}}`              |
 | `resources`      | Object | No       | Compute profiles and resource bindings.        | `{profiles: {}, bindings: {}}`  |
 | `provisioning`   | Object | No       | Post-deployment configuration.                 | `{method: ansible}`             |
@@ -105,6 +110,7 @@ metadata:
     purpose: development
 
 topology: { ... }
+loot: { ... }
 groups: { ... }
 resources: { ... }
 provisioning: { ... }
@@ -299,6 +305,124 @@ topology:
 
     - endpoints: [switch-01, workstation-01]
       bandwidth: 100Mbps
+```
+
+---
+
+## Loot
+
+The loot block catalogs scenario-significant artifacts that exist in the
+environment and may be discovered, decoded, exfiltrated, or otherwise matter to
+the exercise, but do not fit cleanly as topology nodes or RFC-0005
+credentials/edges.
+
+Use `loot` when the important thing is the artifact's embodiment and location
+in the environment: an XOR-obfuscated API key in source code, a checked-in
+repository secret, a sensitive mailbox thread, a database row containing a
+target value, or a response body only visible after some pivot.
+
+`loot` is descriptive, not procedural. It says what artifact exists, where it
+appears, and how it is represented. It does not prescribe how an agent should
+obtain it, and it does not replace typed security relationships when those are
+available elsewhere in the ACES stack.
+
+Loot entries are defined as a map keyed by name (the unique identifier).
+
+| Property         | Type              | Required | Description                                          | Example                               |
+|:-----------------|:------------------|:---------|:-----------------------------------------------------|:--------------------------------------|
+| `display_name`   | String            | No       | Human-readable label.                                | `XOR-obfuscated backend API key`      |
+| `kind`           | LootKind          | Yes      | Broad category of artifact.                          | see [Type Definitions](#type-definitions) |
+| `description`    | String            | Yes      | What the artifact is and why it matters.             | `Recovered key grants backend access` |
+| `sensitivity`    | Tier              | No       | Criticality / impact if exposed.                     | `high`                                |
+| `representation` | Representation    | No       | How the artifact appears in the environment.         | `obfuscated`                          |
+| `related_nodes`  | Array             | No       | Nodes that store, serve, or are affected by it.      | `[web-01, api-01]`                    |
+| `references`     | Array             | No       | Concrete places or interfaces where it is embodied.  | See LootReference                     |
+| `properties`     | Object            | No       | Free-form structured details for scenario semantics. | `{encoding: xor, key_byte: 0x42}`     |
+| `labels`         | Object            | No       | Arbitrary key-value labels.                          | `{objective: "true"}`                 |
+| `notes`          | String            | No       | Freeform documentation.                              | `Visible only after shell access`     |
+
+### LootReference
+
+Use references to point at the concrete place where the artifact lives or
+appears. At least one location-defining field (`path`, `uri`, or `selector`)
+should normally be set.
+
+| Property      | Type              | Required | Description                                         | Example                                  |
+|:--------------|:------------------|:---------|:----------------------------------------------------|:-----------------------------------------|
+| `type`        | LootReferenceType | Yes      | Location kind for this reference.                   | `file`                                   |
+| `node`        | String            | No       | Node that contains or serves the artifact.          | `web-01`                                 |
+| `path`        | String            | No       | File path, repo path, table name, or similar.       | `/srv/web/config.py`                     |
+| `uri`         | String            | No       | URI or endpoint where the artifact can be observed. | `http://api-01.internal/accounts`        |
+| `selector`    | String            | No       | Sub-location, header, query, row, or mailbox hint.  | `header:X-API-Key`                       |
+| `description` | String            | No       | Human-readable explanation of this reference.       | `Static byte array decoded at runtime`   |
+
+### Loot Example
+
+```yaml
+loot:
+  backend_api_key_obfuscated:
+    kind: credential_material
+    description: "Backend API key recoverable from source code after XOR decode."
+    sensitivity: high
+    representation: obfuscated
+    related_nodes: [web-01, api-01]
+    references:
+      - type: file
+        node: web-01
+        path: /srv/web/config.py
+        selector: XOR_ENCODED_API_KEY
+        description: "Static byte array plus XOR key constant."
+      - type: api
+        node: api-01
+        uri: http://api-01.internal/accounts
+        selector: header:X-API-Key
+        description: "Recovered plaintext unlocks the internal API."
+    properties:
+      encoding: xor
+      xor_key: 0x42
+
+  payroll_repo_secret:
+    kind: repository
+    description: "Git repository containing a checked-in .env with a database password."
+    sensitivity: high
+    representation: composite
+    related_nodes: [git-01, db-01]
+    references:
+      - type: repository
+        node: git-01
+        path: /srv/git/payroll-app
+        selector: main:.env
+    properties:
+      contains: db_password
+      branch: main
+
+  executive_mail_thread:
+    kind: email
+    description: "Mailbox thread containing sensitive acquisition documents."
+    sensitivity: high
+    representation: plaintext
+    related_nodes: [mail-01]
+    references:
+      - type: email
+        node: mail-01
+        selector: mailbox:ceo/inbox subject:\"Board acquisition\"
+    properties:
+      message_count: 4
+      attachments: [term-sheet.pdf]
+
+  vault_flag_row:
+    kind: database_record
+    description: "Specific database row whose FLAG column is the scenario objective."
+    sensitivity: critical
+    representation: plaintext
+    related_nodes: [db-01]
+    references:
+      - type: database
+        node: db-01
+        path: bankdb.bank_accounts
+        selector: account_name='Vault Holdings'
+    properties:
+      objective_field: FLAG
 ```
 
 ---
