@@ -22,24 +22,28 @@ when the environment, objective, reset method, telemetry, or scoring are only
 described informally. A shared definition language gives us a path toward
 replayable tests instead of one-off demos.
 
+These RFCs are proposal documents for an evolving schema, and this repository
+is intended to invite review, implementation feedback, and discussion grounded
+in concrete evaluation use cases.
+
 ### Core Idea
 
 The language is split into layers so that reproducibility does not depend on a
-single giant scenario file:
+single giant scenario file. The table below is the main map of how the RFCs
+divide responsibility:
 
-- [rfc-0001-infrastructure-schema.md](rfc/rfc-0001-infrastructure-schema.md) defines the environment: topology, nodes, networks, telemetry, agent platform, connectivity, and important environment artifacts such as `loot`.
-- [rfc-0002-agentic-experiment-specification.md](rfc/rfc-0002-agentic-experiment-specification.md) defines the experiment: agents, objectives, observation/action surfaces, runtime behavior, and runtime `interventions`.
-- [rfc-0003-observability-schema-specification.md](rfc/rfc-0003-observability-schema-specification.md) defines the telemetry conventions that make runs inspectable and comparable.
-- [rfc-0004-scenario-definition-language.md](rfc/rfc-0004-scenario-definition-language.md) defines the reproducibility layer: `Scenario`, `Run`, and `Study`.
-- [rfc-0005-security-domain-schema.md](rfc/rfc-0005-security-domain-schema.md) defines security-domain types such as attack relationships, credential kinds, and evaluation-relevant security metadata.
+| RFC | Primary responsibility | Main question it answers | Representative contents |
+| --- | --- | --- | --- |
+| [RFC-0001](rfc/rfc-0001-infrastructure-schema.md) | Infrastructure schema | What exists in the target world? | Topology, nodes, networks, telemetry endpoints, agent platform, connectivity, and environment artifacts such as `loot` |
+| [RFC-0002](rfc/rfc-0002-agentic-experiment-specification.md) | Agentic experiment schema | What is the agent asked or allowed to do? | Agents, objectives, observation and action surfaces, runtime behavior, and `interventions` |
+| [RFC-0003](rfc/rfc-0003-observability-schema-specification.md) | Observability schema | What evidence should execution emit? | Telemetry conventions, event structure, logging expectations, and comparability-oriented evidence |
+| [RFC-0004](rfc/rfc-0004-scenario-definition-language.md) | Scenario definition language | What exact evaluation unit was run, and how can it be reproduced? | `Scenario`, `Run`, and `Study` objects, reproducible packaging, and recorded run context |
+| [RFC-0005](rfc/rfc-0005-security-domain-schema.md) | Security-domain schema | What security-specific structure should be modeled when a scenario needs it? | Attack relationships, credential kinds, privilege structure, and evaluation-relevant security metadata |
 
-That separation is intentional:
-
-- RFC-0001 says what exists.
-- RFC-0002 says what happens.
-- RFC-0004 says what was run and how it should be reproduced.
-- RFC-0003 says how evidence is recorded.
-- RFC-0005 adds security-domain structure when the scenario needs it.
+That separation is intentional. It lets the repo distinguish world state,
+agent behavior, execution evidence, reproducible packaging, and optional
+security-domain structure without collapsing everything into one monolithic
+scenario file.
 
 ### Why This Repo Exists
 
@@ -72,18 +76,14 @@ telemetry artifacts, an LLM coding agent can:
 
 This is much harder when the evaluation only exists as a paper, a Docker
 Compose file, and a long README. In such a scenario, the agent has to infer hidden
-assumptions. In this language, the important boundaries are (theoretically) explicit:
+assumptions about which facts belong to the environment, which belong to the
+experiment contract, which should appear in telemetry, and which are specific
+to a recorded run. The layered split summarized above reduces that ambiguity,
+which is exactly what helps coding agents do useful work reliably.
 
-- RFC-0001 defines the world the agent is recreating.
-- RFC-0002 defines the behavior, goals, and runtime semantics.
-- RFC-0003 defines the evidence expected from execution.
-- RFC-0004 defines the reproducible unit and the recorded run.
-- RFC-0005 adds cyber-domain structure where needed.
-
-That structure reduces ambiguity, which is exactly what helps coding agents do
-useful work reliably. A well-defined language turns "please recreate this
-cyber evaluation from a vague description" into "implement this versioned
-package and preserve these semantics."
+A well-defined language turns "please recreate this cyber evaluation from a
+vague description" into "implement this versioned package and preserve these
+semantics."
 
 ### Repository Layout
 
