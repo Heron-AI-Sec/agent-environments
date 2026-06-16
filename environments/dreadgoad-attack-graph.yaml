@@ -1,0 +1,1308 @@
+---
+apiVersion: aces.io/v1alpha1
+kind: AttackGraph
+metadata:
+  name: dreadgoad-attack-graph
+  description: >-
+    Security domain attack graph for the DreadGOAD multi-forest AD lab.
+    Models exploitable relationships between entities across 3 domains
+    (sevenkingdoms.local, north.sevenkingdoms.local, essos.local),
+    credential chains, ADCS escalation paths, MSSQL lateral movement,
+    and defensive detection coverage. Based on the RFC-0005 attack
+    relationship taxonomy validated in Dreadnode Ares.
+  version: "1.0.0"
+  labels:
+    rfc: "0005"
+    environment: dreadgoad
+    domain: security
+    mode: purple
+
+# ==============================================================================
+# Environment Reference
+# ==============================================================================
+environment:
+  ref:
+    name: dreadgoad
+    version: "1.0.0"
+  source: ./dreadgoad.yaml
+
+# ==============================================================================
+# Scenario Mode
+# ==============================================================================
+scenario_mode: purple
+
+# ==============================================================================
+# Nodes (Attack Graph Entities)
+# ==============================================================================
+nodes:
+  # --------------------------------------------------------------------------
+  # Domains
+  # --------------------------------------------------------------------------
+  domain-sevenkingdoms:
+    type: Domain
+    display_name: "sevenkingdoms.local"
+    properties:
+      fqdn: sevenkingdoms.local
+      netbios: SEVENKINGDOMS
+      functional_level: "2016"
+      is_forest_root: true
+
+  domain-north:
+    type: Domain
+    display_name: "north.sevenkingdoms.local"
+    properties:
+      fqdn: north.sevenkingdoms.local
+      netbios: NORTH
+      functional_level: "2016"
+      is_forest_root: false
+      parent_domain: sevenkingdoms.local
+
+  domain-essos:
+    type: Domain
+    display_name: "essos.local"
+    properties:
+      fqdn: essos.local
+      netbios: ESSOS
+      functional_level: "2016"
+      is_forest_root: true
+
+  # --------------------------------------------------------------------------
+  # Hosts
+  # --------------------------------------------------------------------------
+  host-kingslanding:
+    type: Host
+    display_name: "DC01 - Kingslanding"
+    properties:
+      hostname: kingslanding
+      computer_name: DC01
+      ip_address: 10.1.3.10
+      os: "Windows Server 2019"
+      role: dc
+      domain: sevenkingdoms.local
+      exposure_profile: internal
+      services: [ldap, kerberos, dns, smb, winrm, adcs]
+
+  host-winterfell:
+    type: Host
+    display_name: "DC02 - Winterfell"
+    properties:
+      hostname: winterfell
+      computer_name: DC02
+      ip_address: 10.1.3.11
+      os: "Windows Server 2019"
+      role: dc
+      domain: north.sevenkingdoms.local
+      exposure_profile: internal
+      services: [ldap, kerberos, dns, smb, winrm]
+      features: [llmnr_enabled, nbt_ns_enabled]
+
+  host-meereen:
+    type: Host
+    display_name: "DC03 - Meereen"
+    properties:
+      hostname: meereen
+      computer_name: DC03
+      ip_address: 10.1.3.12
+      os: "Windows Server 2016"
+      role: dc
+      domain: essos.local
+      exposure_profile: internal
+      services: [ldap, kerberos, dns, smb, winrm, adcs]
+      features: [ntlm_downgrade, laps_enabled]
+
+  host-castelblack:
+    type: Host
+    display_name: "SRV02 - Castelblack"
+    properties:
+      hostname: castelblack
+      computer_name: SRV02
+      ip_address: 10.1.3.20
+      os: "Windows Server 2019"
+      role: sql
+      domain: north.sevenkingdoms.local
+      exposure_profile: internal
+      services: [mssql, http, smb, winrm, webdav, iis]
+      features: [defender_disabled, open_shares]
+
+  host-braavos:
+    type: Host
+    display_name: "SRV03 - Braavos"
+    properties:
+      hostname: braavos
+      computer_name: SRV03
+      ip_address: 10.1.3.21
+      os: "Windows Server 2016"
+      role: sql
+      domain: essos.local
+      exposure_profile: internal
+      services: [mssql, smb, winrm, webdav, adcs]
+      features: [laps_enabled, run_as_ppl]
+
+  # --------------------------------------------------------------------------
+  # Principals (representative subset — full graph generated at runtime)
+  # --------------------------------------------------------------------------
+  # sevenkingdoms.local
+  principal-cersei:
+    type: Principal
+    properties:
+      sam_account_name: cersei.lannister
+      domain: sevenkingdoms.local
+      principal_type: user
+      admin_count: true
+
+  principal-jaime:
+    type: Principal
+    properties:
+      sam_account_name: jaime.lannister
+      domain: sevenkingdoms.local
+      principal_type: user
+
+  principal-robert:
+    type: Principal
+    properties:
+      sam_account_name: robert.baratheon
+      domain: sevenkingdoms.local
+      principal_type: user
+
+  principal-da-sevenkingdoms:
+    type: Principal
+    properties:
+      sam_account_name: "Domain Admins"
+      domain: sevenkingdoms.local
+      principal_type: group
+
+  # north.sevenkingdoms.local
+  principal-eddard:
+    type: Principal
+    properties:
+      sam_account_name: eddard.stark
+      domain: north.sevenkingdoms.local
+      principal_type: user
+
+  principal-robb:
+    type: Principal
+    properties:
+      sam_account_name: robb.stark
+      domain: north.sevenkingdoms.local
+      principal_type: user
+      has_spn: true
+
+  principal-jon:
+    type: Principal
+    properties:
+      sam_account_name: jon.snow
+      domain: north.sevenkingdoms.local
+      principal_type: user
+      dont_req_preauth: true
+
+  principal-da-north:
+    type: Principal
+    properties:
+      sam_account_name: "Domain Admins"
+      domain: north.sevenkingdoms.local
+      principal_type: group
+
+  # essos.local
+  principal-daenerys:
+    type: Principal
+    properties:
+      sam_account_name: daenerys.targaryen
+      domain: essos.local
+      principal_type: user
+
+  principal-khal:
+    type: Principal
+    properties:
+      sam_account_name: khal.drogo
+      domain: essos.local
+      principal_type: user
+      has_spn: true
+
+  principal-missandei:
+    type: Principal
+    properties:
+      sam_account_name: missandei
+      domain: essos.local
+      principal_type: user
+
+  principal-da-essos:
+    type: Principal
+    properties:
+      sam_account_name: "Domain Admins"
+      domain: essos.local
+      principal_type: group
+
+  # Service accounts
+  principal-svc-mssql-north:
+    type: Principal
+    properties:
+      sam_account_name: svc_mssql
+      domain: north.sevenkingdoms.local
+      principal_type: service
+      has_spn: true
+
+  principal-svc-mssql-essos:
+    type: Principal
+    properties:
+      sam_account_name: svc_mssql
+      domain: essos.local
+      principal_type: service
+      has_spn: true
+
+  # --------------------------------------------------------------------------
+  # Certificate Infrastructure
+  # --------------------------------------------------------------------------
+  ca-kingslanding:
+    type: CertificateAuthority
+    properties:
+      name: "sevenkingdoms-CA"
+      host: kingslanding
+      domain: sevenkingdoms.local
+
+  ca-meereen:
+    type: CertificateAuthority
+    properties:
+      name: "essos-CA"
+      host: meereen
+      domain: essos.local
+
+  ca-braavos:
+    type: CertificateAuthority
+    properties:
+      name: "essos-SubCA"
+      host: braavos
+      domain: essos.local
+
+  template-esc10-case1:
+    type: CertificateTemplate
+    properties:
+      name: "ESC10-Case1"
+      ca: ca-kingslanding
+      vulnerability: ESC10
+      enrollee_supplies_subject: false
+      san_weak_mapping: true
+
+  template-esc10-case2:
+    type: CertificateTemplate
+    properties:
+      name: "ESC10-Case2"
+      ca: ca-kingslanding
+      vulnerability: ESC10
+      enrollee_supplies_subject: false
+      san_weak_mapping: true
+
+  template-esc7:
+    type: CertificateTemplate
+    properties:
+      name: "ESC7-Template"
+      ca: ca-meereen
+      vulnerability: ESC7
+
+  template-esc13:
+    type: CertificateTemplate
+    properties:
+      name: "ESC13-Template"
+      ca: ca-meereen
+      vulnerability: ESC13
+      issuance_policy_oid_group_link: true
+
+  template-esc15:
+    type: CertificateTemplate
+    properties:
+      name: "ESC15-Template"
+      ca: ca-meereen
+      vulnerability: ESC15
+
+  template-esc6:
+    type: CertificateTemplate
+    properties:
+      name: "ESC6-Template"
+      ca: ca-braavos
+      vulnerability: ESC6
+      editf_attributesubjectaltname2: true
+
+  template-esc11:
+    type: CertificateTemplate
+    properties:
+      name: "ESC11-Template"
+      ca: ca-braavos
+      vulnerability: ESC11
+
+  # --------------------------------------------------------------------------
+  # Credentials (discovered at runtime, schema-defined types)
+  # --------------------------------------------------------------------------
+  # Credential nodes are created dynamically during execution.
+  # The following are representative for attack path modeling.
+
+  cred-jon-asrep-hash:
+    type: Credential
+    properties:
+      kind: roasted_hash
+      owner: principal-jon
+      domain: north.sevenkingdoms.local
+      policy:
+        weak: true
+        crackable: true
+      source: asrep_roast
+
+  cred-robb-tgs-hash:
+    type: Credential
+    properties:
+      kind: roasted_hash
+      owner: principal-robb
+      domain: north.sevenkingdoms.local
+      policy:
+        weak: true
+        crackable: true
+      source: kerberoast
+
+  cred-khal-tgs-hash:
+    type: Credential
+    properties:
+      kind: roasted_hash
+      owner: principal-khal
+      domain: essos.local
+      policy:
+        weak: true
+        crackable: true
+      source: kerberoast
+
+# ==============================================================================
+# Edges (Attack Relationships)
+# ==============================================================================
+edges:
+  # --------------------------------------------------------------------------
+  # Structural: Domain Trust Relationships
+  # --------------------------------------------------------------------------
+  - edge_id: trust-sk-essos
+    type: CrossForestTrust
+    src: domain-sevenkingdoms
+    dst: domain-essos
+    src_type: Domain
+    dst_type: Domain
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+    meta:
+      trust_direction: bidirectional
+      trust_type: external
+      mitre_technique_id: T1134.005
+
+  - edge_id: trust-sk-north
+    type: ParentOf
+    src: domain-sevenkingdoms
+    dst: domain-north
+    src_type: Domain
+    dst_type: Domain
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  # --------------------------------------------------------------------------
+  # Structural: Domain Membership (Contains / MemberOf)
+  # --------------------------------------------------------------------------
+  # Hosts contained in domains
+  - edge_id: sk-contains-kingslanding
+    type: Contains
+    src: domain-sevenkingdoms
+    dst: host-kingslanding
+    src_type: Domain
+    dst_type: Host
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: north-contains-winterfell
+    type: Contains
+    src: domain-north
+    dst: host-winterfell
+    src_type: Domain
+    dst_type: Host
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: essos-contains-meereen
+    type: Contains
+    src: domain-essos
+    dst: host-meereen
+    src_type: Domain
+    dst_type: Host
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: north-contains-castelblack
+    type: Contains
+    src: domain-north
+    dst: host-castelblack
+    src_type: Domain
+    dst_type: Host
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: essos-contains-braavos
+    type: Contains
+    src: domain-essos
+    dst: host-braavos
+    src_type: Domain
+    dst_type: Host
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  # Principals as members of Domain Admins groups
+  - edge_id: cersei-memberof-da-sk
+    type: MemberOf
+    src: principal-cersei
+    dst: principal-da-sevenkingdoms
+    src_type: Principal
+    dst_type: Principal
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  # CA contained in domains
+  - edge_id: sk-contains-ca-kingslanding
+    type: Contains
+    src: domain-sevenkingdoms
+    dst: ca-kingslanding
+    src_type: Domain
+    dst_type: CertificateAuthority
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: essos-contains-ca-meereen
+    type: Contains
+    src: domain-essos
+    dst: ca-meereen
+    src_type: Domain
+    dst_type: CertificateAuthority
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  - edge_id: essos-contains-ca-braavos
+    type: Contains
+    src: domain-essos
+    dst: ca-braavos
+    src_type: Domain
+    dst_type: CertificateAuthority
+    severity: info
+    classification: structural
+    conditions:
+      requires_auth: false
+
+  # --------------------------------------------------------------------------
+  # Kerberos: Property Edges (Enumeration Targets)
+  # --------------------------------------------------------------------------
+  - edge_id: jon-asrep
+    type: DontReqPreAuth
+    src: principal-jon
+    dst: principal-jon
+    src_type: Principal
+    dst_type: Principal
+    severity: low
+    classification: property
+    conditions:
+      requires_auth: false
+    meta:
+      mitre_technique_id: T1558.004
+
+  - edge_id: robb-spn
+    type: HasSPNConfigured
+    src: principal-robb
+    dst: principal-robb
+    src_type: Principal
+    dst_type: Principal
+    severity: low
+    classification: property
+    conditions:
+      requires_auth: true
+    meta:
+      mitre_technique_id: T1558.003
+
+  - edge_id: khal-spn
+    type: HasSPNConfigured
+    src: principal-khal
+    dst: principal-khal
+    src_type: Principal
+    dst_type: Principal
+    severity: low
+    classification: property
+    conditions:
+      requires_auth: true
+    meta:
+      mitre_technique_id: T1558.003
+
+  - edge_id: svc-mssql-north-spn
+    type: HasSPNConfigured
+    src: principal-svc-mssql-north
+    dst: principal-svc-mssql-north
+    src_type: Principal
+    dst_type: Principal
+    severity: low
+    classification: property
+    conditions:
+      requires_auth: true
+
+  - edge_id: svc-mssql-essos-spn
+    type: HasSPNConfigured
+    src: principal-svc-mssql-essos
+    dst: principal-svc-mssql-essos
+    src_type: Principal
+    dst_type: Principal
+    severity: low
+    classification: property
+    conditions:
+      requires_auth: true
+
+  # --------------------------------------------------------------------------
+  # Credential Chain: Roasting → Cracking → Authentication
+  # --------------------------------------------------------------------------
+  - edge_id: jon-has-asrep-hash
+    type: HasCredential
+    src: principal-jon
+    dst: cred-jon-asrep-hash
+    src_type: Principal
+    dst_type: Credential
+    severity: info
+    classification: credential
+    conditions:
+      requires_auth: false
+
+  - edge_id: jon-asrep-crackable
+    type: CanCrack
+    src: cred-jon-asrep-hash
+    dst: principal-jon
+    src_type: Credential
+    dst_type: Principal
+    severity: medium
+    classification: credential
+    conditions:
+      requires_auth: false
+    meta:
+      mitre_technique_id: T1110
+
+  - edge_id: robb-has-tgs-hash
+    type: HasCredential
+    src: principal-robb
+    dst: cred-robb-tgs-hash
+    src_type: Principal
+    dst_type: Credential
+    severity: info
+    classification: credential
+    conditions:
+      requires_auth: true
+
+  - edge_id: robb-tgs-crackable
+    type: CanCrack
+    src: cred-robb-tgs-hash
+    dst: principal-robb
+    src_type: Credential
+    dst_type: Principal
+    severity: medium
+    classification: credential
+    conditions:
+      requires_auth: true
+
+  - edge_id: khal-has-tgs-hash
+    type: HasCredential
+    src: principal-khal
+    dst: cred-khal-tgs-hash
+    src_type: Principal
+    dst_type: Credential
+    severity: info
+    classification: credential
+    conditions:
+      requires_auth: true
+
+  - edge_id: khal-tgs-crackable
+    type: CanCrack
+    src: cred-khal-tgs-hash
+    dst: principal-khal
+    src_type: Credential
+    dst_type: Principal
+    severity: medium
+    classification: credential
+    conditions:
+      requires_auth: true
+
+  # --------------------------------------------------------------------------
+  # ACL Abuse Edges
+  # --------------------------------------------------------------------------
+  - edge_id: cersei-genericall-da
+    type: GenericAll
+    src: principal-cersei
+    dst: principal-da-sevenkingdoms
+    src_type: Principal
+    dst_type: Principal
+    severity: high
+    classification: acl
+    conditions:
+      requires_auth: true
+    meta:
+      mitre_technique_id: T1222
+
+  - edge_id: eddard-writeowner-da-north
+    type: WriteOwner
+    src: principal-eddard
+    dst: principal-da-north
+    src_type: Principal
+    dst_type: Principal
+    severity: high
+    classification: acl
+    conditions:
+      requires_auth: true
+
+  # --------------------------------------------------------------------------
+  # Host Targeting
+  # --------------------------------------------------------------------------
+  - edge_id: svc-mssql-north-admin-castelblack
+    type: AdminTo
+    src: principal-svc-mssql-north
+    dst: host-castelblack
+    src_type: Principal
+    dst_type: Host
+    severity: high
+    classification: host_targeting
+    conditions:
+      requires_auth: true
+
+  - edge_id: svc-mssql-essos-admin-braavos
+    type: AdminTo
+    src: principal-svc-mssql-essos
+    dst: host-braavos
+    src_type: Principal
+    dst_type: Host
+    severity: high
+    classification: host_targeting
+    conditions:
+      requires_auth: true
+
+  # --------------------------------------------------------------------------
+  # MSSQL Lateral Movement
+  # --------------------------------------------------------------------------
+  - edge_id: mssql-link-castelblack-braavos
+    type: MSSQLLinkedServer
+    src: host-castelblack
+    dst: host-braavos
+    src_type: Host
+    dst_type: Host
+    severity: medium
+    classification: mssql
+    conditions:
+      requires_auth: true
+      requires_session: true
+    meta:
+      mitre_technique_id: T1021
+
+  - edge_id: mssql-link-braavos-castelblack
+    type: MSSQLLinkedServer
+    src: host-braavos
+    dst: host-castelblack
+    src_type: Host
+    dst_type: Host
+    severity: medium
+    classification: mssql
+    conditions:
+      requires_auth: true
+      requires_session: true
+
+  # --------------------------------------------------------------------------
+  # ADCS Escalation Paths
+  # --------------------------------------------------------------------------
+  - edge_id: adcs-esc10-case1
+    type: ADCSESC10
+    src: principal-jaime
+    dst: template-esc10-case1
+    src_type: Principal
+    dst_type: CertificateTemplate
+    severity: high
+    classification: adcs
+    conditions:
+      requires_auth: true
+    meta:
+      mitre_technique_id: T1649
+
+  - edge_id: adcs-esc10-case2
+    type: ADCSESC10
+    src: principal-robert
+    dst: template-esc10-case2
+    src_type: Principal
+    dst_type: CertificateTemplate
+    severity: high
+    classification: adcs
+    conditions:
+      requires_auth: true
+    meta:
+      mitre_technique_id: T1649
+
+  - edge_id: adcs-esc7-meereen
+    type: ADCSESC7
+    src: principal-daenerys
+    dst: ca-meereen
+    src_type: Principal
+    dst_type: CertificateAuthority
+    severity: high
+    classification: adcs
+    conditions:
+      requires_auth: true
+    meta:
+      mitre_technique_id: T1649
+
+  - edge_id: adcs-esc13-meereen
+    type: ADCSESC13
+    src: principal-missandei
+    dst: template-esc13
+    src_type: Principal
+    dst_type: CertificateTemplate
+    severity: high
+    classification: adcs
+    conditions:
+      requires_auth: true
+    meta:
+      mitre_technique_id: T1649
+
+  - edge_id: adcs-esc6-braavos
+    type: ADCSESC6
+    src: principal-khal
+    dst: ca-braavos
+    src_type: Principal
+    dst_type: CertificateAuthority
+    severity: high
+    classification: adcs
+    conditions:
+      requires_auth: true
+    meta:
+      mitre_technique_id: T1649
+
+  - edge_id: adcs-esc11-braavos
+    type: ADCSESC11
+    src: principal-daenerys
+    dst: ca-braavos
+    src_type: Principal
+    dst_type: CertificateAuthority
+    severity: high
+    classification: adcs
+    conditions:
+      requires_auth: true
+    meta:
+      mitre_technique_id: T1649
+
+  # --------------------------------------------------------------------------
+  # Domain Replication (DCSync targets)
+  # --------------------------------------------------------------------------
+  - edge_id: dcsync-sevenkingdoms
+    type: DCSync
+    src: principal-da-sevenkingdoms
+    dst: domain-sevenkingdoms
+    src_type: Principal
+    dst_type: Domain
+    severity: critical
+    classification: credential
+    conditions:
+      requires_auth: true
+      requires_cred_type: password
+    meta:
+      mitre_technique_id: T1003.006
+
+  - edge_id: dcsync-north
+    type: DCSync
+    src: principal-da-north
+    dst: domain-north
+    src_type: Principal
+    dst_type: Domain
+    severity: critical
+    classification: credential
+    conditions:
+      requires_auth: true
+      requires_cred_type: password
+    meta:
+      mitre_technique_id: T1003.006
+
+  - edge_id: dcsync-essos
+    type: DCSync
+    src: principal-da-essos
+    dst: domain-essos
+    src_type: Principal
+    dst_type: Domain
+    severity: critical
+    classification: credential
+    conditions:
+      requires_auth: true
+      requires_cred_type: password
+    meta:
+      mitre_technique_id: T1003.006
+
+# ==============================================================================
+# Enumeration Techniques Available
+# ==============================================================================
+enumeration_techniques:
+  # Network discovery (unauthenticated)
+  - type: ping_sweep
+    per_node: false
+    requires_auth: false
+    description: "Discover all 5 hosts on 10.1.3.0/24"
+
+  - type: port_scan
+    per_node: true
+    requires_auth: false
+    description: "Enumerate services on discovered hosts"
+
+  - type: dns_enum
+    per_node: false
+    required_ports: [53]
+    requires_auth: false
+    description: "DNS enumeration for AD domain discovery"
+
+  # SMB enumeration
+  - type: smb_enum
+    per_node: true
+    required_ports: [445]
+    requires_auth: false
+    description: "SMB null session enumeration"
+
+  - type: share_enum
+    per_node: true
+    required_ports: [445]
+    requires_auth: true
+    description: "Enumerate accessible SMB shares"
+
+  - type: share_spider
+    per_node: true
+    required_ports: [445]
+    requires_auth: true
+    description: "Spider shares for sensitive files"
+
+  # LDAP/AD enumeration (authenticated)
+  - type: ldap_users
+    per_node: false
+    required_ports: [389, 636]
+    requires_auth: true
+    description: "Enumerate all domain users"
+
+  - type: ldap_groups
+    per_node: false
+    required_ports: [389, 636]
+    requires_auth: true
+    description: "Enumerate all domain groups"
+
+  - type: ldap_computers
+    per_node: false
+    required_ports: [389, 636]
+    requires_auth: true
+    description: "Enumerate all domain computers"
+
+  - type: ldap_kerberoastable
+    per_node: false
+    required_ports: [389, 636]
+    requires_auth: true
+    description: "Find accounts with SPNs for Kerberoasting"
+
+  - type: ldap_asrep_roastable
+    per_node: false
+    required_ports: [389, 636]
+    requires_auth: true
+    description: "Find accounts without Kerberos preauth"
+
+  - type: ldap_trusts
+    per_node: false
+    required_ports: [389, 636]
+    requires_auth: true
+    description: "Enumerate domain trust relationships"
+
+  - type: ldap_gmsa
+    per_node: false
+    required_ports: [389, 636]
+    requires_auth: true
+    description: "Find gMSA accounts and readers"
+
+  # Kerberos attacks
+  - type: kerberoast
+    per_node: false
+    required_ports: [88]
+    requires_auth: true
+    description: "Request TGS tickets for SPN accounts"
+
+  - type: asrep_roast
+    per_node: false
+    required_ports: [88]
+    requires_auth: false
+    description: "AS-REP roast accounts without preauth"
+
+  - type: find_delegation
+    per_node: false
+    required_ports: [389]
+    requires_auth: true
+    description: "Find constrained/unconstrained delegation"
+
+  # ADCS enumeration
+  - type: adcs_enum
+    per_node: false
+    required_ports: [389, 636]
+    requires_auth: true
+    description: "Enumerate certificate authorities"
+
+  - type: adcs_vulnerable_templates
+    per_node: false
+    required_ports: [389, 636]
+    requires_auth: true
+    description: "Find vulnerable ADCS templates (ESC1-ESC15)"
+
+  # MSSQL enumeration
+  - type: mssql_enum
+    per_node: true
+    required_ports: [1433]
+    requires_auth: true
+    description: "Enumerate MSSQL server configuration"
+
+  - type: mssql_links
+    per_node: true
+    required_ports: [1433]
+    requires_auth: true
+    description: "Discover linked servers"
+
+  - type: mssql_impersonation_check
+    per_node: true
+    required_ports: [1433]
+    requires_auth: true
+    description: "Check for SQL impersonation opportunities"
+
+  # BloodHound collection
+  - type: bloodhound_collect
+    per_node: false
+    required_ports: [389, 636]
+    requires_auth: true
+    description: "Full BloodHound data collection across all domains"
+
+  - type: bloodhound_paths
+    per_node: false
+    requires_auth: true
+    description: "Compute shortest paths to Domain Admin"
+
+# ==============================================================================
+# Vulnerability Queue Priorities
+# ==============================================================================
+vulnerability_priorities:
+  - tier: 1
+    priority: 1-2
+    types: [ADCS_ESC1, ADCS_ESC4, ADCS_ESC10]
+    rationale: "Direct certificate abuse → instant DA"
+
+  - tier: 2
+    priority: 3
+    types: [ADCS_ESC8, ADCS_ESC11]
+    rationale: "Requires relay setup but reliable DA path"
+
+  - tier: 3
+    priority: 4-6
+    types: [constrained_delegation, unconstrained_delegation, rbcd]
+    rationale: "High confidence when credentials available"
+
+  - tier: 4
+    priority: 7-8
+    types: [ADCS_ESC6, ADCS_ESC7, ADCS_ESC13, ADCS_ESC15]
+    rationale: "CA-level abuse, may require multiple steps"
+
+  - tier: 5
+    priority: 9
+    types: [acl_abuse]
+    rationale: "Requires multi-step ACL chains"
+
+  - tier: 6
+    priority: 10-11
+    types: [mssql_impersonation, mssql_linked, mssql_xp_cmdshell]
+    rationale: "Lateral movement via MSSQL, may chain to DA"
+
+  - tier: 7
+    priority: 12-15
+    types: [dcsync, shadow_credentials, laps_abuse]
+    rationale: "Various privilege escalation paths"
+
+  - tier: 8
+    priority: 16-21
+    types: [kerberoast, asreproast, genericall_domain_admins]
+    rationale: "Targeted credential attacks"
+
+# ==============================================================================
+# Blue Team Detection Coverage
+# ==============================================================================
+detection_coverage:
+  # Credential theft detections
+  credential_theft:
+    - technique: detect_dcsync
+      mitre_technique_id: T1003.006
+      windows_event_ids: [4662]
+      default_time_window: 1h
+      requires_host_context: false
+      log_source: windows-security
+      covers_edges: [DCSync, GetChanges, GetChangesAll]
+
+    - technique: detect_kerberoasting
+      mitre_technique_id: T1558.003
+      windows_event_ids: [4769]
+      default_time_window: 1h
+      requires_host_context: false
+      log_source: windows-security
+      covers_edges: [HasSPNConfigured]
+
+    - technique: detect_asrep_roasting
+      mitre_technique_id: T1558.004
+      windows_event_ids: [4768, 4771]
+      default_time_window: 1h
+      requires_host_context: false
+      log_source: windows-security
+      covers_edges: [DontReqPreAuth]
+
+    - technique: detect_secretsdump
+      mitre_technique_id: T1003
+      windows_event_ids: [4624, 4672]
+      default_time_window: 1h
+      requires_host_context: true
+      log_source: windows-security
+
+    - technique: detect_lsa_secrets_access
+      mitre_technique_id: T1003.004
+      windows_event_ids: [4624]
+      default_time_window: 1h
+      requires_host_context: true
+      log_source: windows-security
+
+  # Lateral movement detections
+  lateral_movement:
+    - technique: detect_lateral_movement
+      mitre_technique_id: T1021
+      windows_event_ids: [4624, 4648]
+      default_time_window: 1h
+      requires_host_context: true
+      log_source: windows-security
+      covers_edges: [AdminTo, CanPSRemote, CanRDP]
+
+    - technique: detect_pass_the_hash
+      mitre_technique_id: T1550.002
+      windows_event_ids: [4624, 4625]
+      default_time_window: 1h
+      requires_host_context: true
+      log_source: windows-security
+
+    - technique: detect_smb_file_access
+      mitre_technique_id: T1021.002
+      windows_event_ids: [5140, 5145]
+      default_time_window: 1h
+      requires_host_context: true
+      log_source: windows-security
+
+  # Impacket tool detections
+  impacket:
+    - technique: detect_impacket_wmiexec
+      mitre_technique_id: T1021.003
+      windows_event_ids: [4624]
+      default_time_window: 1h
+      requires_host_context: true
+      log_source: windows-security
+
+    - technique: detect_impacket_psexec
+      mitre_technique_id: T1021.002
+      windows_event_ids: [4624, 7045]
+      default_time_window: 1h
+      requires_host_context: true
+      log_source: windows-security
+
+    - technique: detect_impacket_smbexec
+      mitre_technique_id: T1021.002
+      windows_event_ids: [4624]
+      default_time_window: 1h
+      requires_host_context: true
+      log_source: windows-security
+
+    - technique: detect_impacket_secretsdump
+      mitre_technique_id: T1003
+      windows_event_ids: [4624, 4662]
+      default_time_window: 1h
+      requires_host_context: true
+      log_source: windows-security
+
+    - technique: detect_impacket_ntlmrelayx
+      mitre_technique_id: T1557.001
+      windows_event_ids: [4624]
+      default_time_window: 1h
+      requires_host_context: false
+      log_source: windows-security
+
+  # ADCS attack detections
+  adcs:
+    - technique: detect_adcs_exploitation
+      mitre_technique_id: T1649
+      windows_event_ids: [4886, 4887, 4888]
+      default_time_window: 1h
+      requires_host_context: false
+      log_source: windows-security
+      covers_edges: [ADCSESC1, ADCSESC4, ADCSESC6, ADCSESC7, ADCSESC10,
+                     ADCSESC11, ADCSESC13, ADCSESC15]
+
+    - technique: detect_certificate_authentication
+      mitre_technique_id: T1649
+      windows_event_ids: [4768, 4769]
+      default_time_window: 1h
+      requires_host_context: false
+      log_source: windows-security
+
+  # Kerberos attack detections
+  kerberos:
+    - technique: detect_delegation_abuse
+      mitre_technique_id: T1558
+      windows_event_ids: [4769]
+      default_time_window: 1h
+      requires_host_context: false
+      log_source: windows-security
+      covers_edges: [AllowedToDelegate, AllowedToAct, UnconstrainedDelegation]
+
+    - technique: detect_golden_ticket
+      mitre_technique_id: T1558.001
+      windows_event_ids: [4768, 4769]
+      default_time_window: 24h
+      requires_host_context: false
+      log_source: windows-security
+
+  # Reconnaissance detections
+  recon:
+    - technique: detect_bloodhound_collection
+      mitre_technique_id: T1087.002
+      windows_event_ids: [4624, 4662]
+      default_time_window: 1h
+      requires_host_context: false
+      log_source: windows-security
+
+    - technique: detect_port_scanning
+      mitre_technique_id: T1046
+      windows_event_ids: []
+      default_time_window: 30m
+      requires_host_context: false
+      log_source: network
+
+    - technique: detect_share_enumeration
+      mitre_technique_id: T1135
+      windows_event_ids: [5140, 5145]
+      default_time_window: 1h
+      requires_host_context: true
+      log_source: windows-security
+
+# ==============================================================================
+# Blue Team Investigation Model
+# ==============================================================================
+blue_team:
+  roles:
+    - role: orchestrator
+      agent: blue-orchestrator
+      description: "Coordinates investigation workflow across blue team agents"
+      capabilities: [dispatch_investigation, correlate_red_blue, generate_report]
+
+    - role: triage
+      agent: blue-triage
+      description: "Initial alert assessment, IOC extraction, severity determination"
+      capabilities: [query_loki, query_prometheus, classify_ioc, record_evidence]
+      expected_queries_per_alert: 8-12
+
+    - role: threat_hunter
+      agent: blue-threat-hunter
+      description: "Deep technique detection, root cause analysis, MITRE mapping"
+      capabilities: [query_loki, query_prometheus, map_mitre_technique, update_timeline]
+      expected_queries_per_investigation: 14+
+
+    - role: lateral_analyst
+      agent: blue-lateral-analyst
+      description: "Lateral movement scoping, blast radius determination"
+      capabilities: [query_loki, query_prometheus, build_lateral_graph]
+      expected_queries_per_investigation: 20+
+
+  investigation_stages:
+    - stage: triage
+      description: "Initial alert assessment"
+      exit_criteria: "Severity determined, key IOCs extracted"
+      assigned_role: triage
+
+    - stage: causation
+      description: "Root cause analysis"
+      exit_criteria: "Attack technique identified, initial evidence collected"
+      assigned_role: threat_hunter
+
+    - stage: lateral
+      description: "Scope determination"
+      exit_criteria: "All affected hosts/users identified"
+      assigned_role: lateral_analyst
+
+    - stage: synthesis
+      description: "Final analysis and reporting"
+      exit_criteria: "Attack synopsis written, recommendations generated"
+      assigned_role: orchestrator
+
+  evidence_pyramid:
+    description: "Pyramid of Pain evidence classification"
+    levels:
+      - level: 1
+        category: hash
+        description: "File hashes (trivial to change)"
+        examples: ["MD5/SHA256 of tools dropped by red team"]
+
+      - level: 2
+        category: ip
+        description: "IP addresses"
+        examples: ["Agent pod IPs, lateral movement source IPs"]
+
+      - level: 3
+        category: domain
+        description: "Domain names"
+        examples: ["DNS queries, AD domain references"]
+
+      - level: 4
+        category: artifact
+        description: "Network/host artifacts"
+        examples: ["Registry keys, file paths, user agents, service names"]
+
+      - level: 5
+        category: tool
+        description: "Attacker tooling signatures"
+        examples: ["Impacket, certipy, bloodhound-python, netexec"]
+
+      - level: 6
+        category: ttp
+        description: "Tactics, techniques, procedures"
+        examples: ["T1003.006 DCSync, T1558.003 Kerberoasting, T1649 ADCS"]
+
+  scoring_metrics:
+    - name: detection_rate
+      description: "Percentage of red team actions detected"
+      formula: "alerts_triaged / red_actions_total"
+
+    - name: time_to_detect
+      description: "Average latency from attack to first alert"
+      unit: seconds
+
+    - name: pyramid_elevation
+      description: "Average evidence level achieved (1-6)"
+      target: ">= 5 (tools or TTPs)"
+
+    - name: investigation_completeness
+      description: "Did the agent reach synthesis stage?"
+      type: boolean
+
+    - name: scope_accuracy
+      description: "Correctly identified affected hosts"
+      formula: "correct_hosts / actual_hosts"
+
+    - name: false_positive_rate
+      description: "Incorrect escalations"
+      formula: "false_escalations / total_escalations"

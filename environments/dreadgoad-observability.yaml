@@ -1,0 +1,996 @@
+---
+apiVersion: aces.io/v1alpha1
+kind: ObservabilitySchema
+metadata:
+  name: dreadgoad-observability
+  description: >-
+    Observability schema for the DreadGOAD multi-forest AD lab environment.
+    Reflects the production Argonaut observability stack deployed in the dev
+    environment (Grafana, Loki, Tempo, Prometheus, Mimir, Alloy, OTel Gateway).
+    Defines telemetry semantics, the deployed stack topology, alert rule
+    coverage, dashboard inventory, storage tiers, trace metrics generation,
+    and MITRE ATT&CK-annotated detection rules for AD attack scenarios.
+  version: "1.0.0"
+  labels:
+    rfc: "0003"
+    environment: dreadgoad
+    domain: security
+    platform: argonaut
+    deployment: dev
+
+# ==============================================================================
+# Schema Reference
+# ==============================================================================
+schema:
+  ref: "aces.io/schema/v1"
+  tier: medium
+  extensions:
+    - name: security
+      version: "1.0.0"
+
+# ==============================================================================
+# Deployed Stack
+# ==============================================================================
+# Reflects the Argonaut observability stack in the dev environment.
+# All components are Kubernetes Helm charts in namespace `observability`,
+# deployed via Kustomize with base + environment-specific value patches.
+stack:
+  namespace: observability
+  deployment_method: kustomize_helm
+
+  components:
+    grafana:
+      chart: grafana
+      version: "10.5.15"
+      replicas: 2
+      backend: postgresql
+      ingress: grafana.dev.plundr.ai
+      features:
+        - oauth_authentication
+        - provisioned_dashboards
+        - provisioned_alert_rules
+        - provisioned_datasources
+
+    loki:
+      chart: loki
+      version: "6.55.0"
+      deployment_mode: SimpleScalable
+      replicas:
+        read: 6
+        write: 3
+        backend: 2
+      storage:
+        type: s3
+        bucket: dev-argonaut-loki
+        region: us-west-2
+      schema: tsdb_v13
+      replication_factor: 3
+      ingress: loki.dev.plundr.ai
+
+    tempo:
+      chart: tempo
+      version: "1.24.4"
+      storage:
+        type: s3
+        bucket: dev-argonaut-tempo
+      receivers:
+        - otlp_grpc
+        - otlp_http
+        - jaeger_grpc
+        - jaeger_thrift
+        - zipkin
+      metrics_generator:
+        enabled: true
+        # Attack-specific span dimensions extracted into RED metrics
+        dimensions:
+          - service.name
+          - service.namespace
+          - host.name
+          - host.id
+          - deployment.environment
+          - deployment.name
+          - attack_team
+          - attack_phase
+          - attack_operation_id
+          - attack_operation_name
+          - attack_tool_name
+          - attack_tool_category
+          - target.environment
+          - target_domain
+          - target_type
+          - discovery.type
+
+    prometheus:
+      chart: kube-prometheus-stack
+      version: "83.7.0"
+      replicas: 2
+      ha_dedup: true
+      storage:
+        type: persistent_volume
+        size: 100Gi
+        class: gp3
+      alertmanager:
+        replicas: 3
+        gossip_ha: true
+        routing:
+          - channel: slack
+            severity: [critical, warning]
+      ingress:
+        prometheus: prometheus.dev.plundr.ai
+        alertmanager: alertmanager.dev.plundr.ai
+
+    mimir:
+      chart: mimir-distributed
+      version: "6.0.6"
+      storage:
+        type: s3
+        bucket: dev-argonaut-mimir
+      ha_dedup: true
+      out_of_order_window: 30m
+      description: "Long-term metrics storage"
+
+    alloy:
+      chart: alloy
+      version: "1.7.0"
+      deployment_mode: daemonset
+      priority: system-critical
+      collection:
+        # Kubernetes pod logs
+        - type: kubernetes_pods
+          discovery: kubernetes
+          processing:
+            - extract_log_levels
+            - parse_json
+            - drop_logs_older_than_3h
+          destination: loki
+
+        # Systemd journal logs
+        - type: journal
+          format: json
+          destination: loki
+
+        # OTLP traces (bifurcated output)
+        - type: otlp_traces
+          receivers:
+            - grpc: 4317
+            - http: 4318
+          destinations:
+            - name: tempo
+              endpoint: "tempo.observability.svc.cluster.local:4317"
+              purpose: internal_storage
+            - name: otel-gateway
+              endpoint: "otel-gateway-opentelemetry-collector.observability.svc.cluster.local:4317"
+              purpose: platform_export
+      ingress:
+        otlp_http: otlp.dev.plundr.ai
+        port: 4318
+
+    otel-gateway:
+      chart: opentelemetry-collector
+      version: "0.150.1"
+      purpose: "Export traces to Dreadnode Platform"
+      export_endpoint: "https://platform.dev.plundr.ai/api/otel/traces"
+      auth: api_key
+      batch_size: 1000-2000
+
+    goldilocks:
+      chart: goldilocks
+      version: "10.3.0"
+      purpose: "Kubernetes resource optimization recommendations"
+      ingress: goldilocks.dev.plundr.ai
+
+# ==============================================================================
+# Storage Tiers & Retention
+# ==============================================================================
+storage:
+  logs:
+    backend: loki
+    storage_type: s3
+    bucket: dev-argonaut-loki
+    default_retention: 14d
+    extended_retention:
+      namespaces:
+        - pattern: "attack-simulation-*"
+          retention: 180d
+          rationale: "Extended retention for red/blue team analysis"
+    query_limits:
+      max_entries_per_query: 10000
+      max_parallel_queries: 64
+      max_series: 5000
+    chunks_cache: 4Gi
+
+  traces:
+    backend: tempo
+    storage_type: s3
+    bucket: dev-argonaut-tempo
+    retention: 30d
+
+  metrics_short_term:
+    backend: prometheus
+    storage_type: persistent_volume
+    size: 100Gi
+    volume_type: gp3
+
+  metrics_long_term:
+    backend: mimir
+    storage_type: s3
+    bucket: dev-argonaut-mimir
+    retention: 365d
+
+# ==============================================================================
+# Trace Metrics Generation (Tempo)
+# ==============================================================================
+# Tempo metrics generator produces RED (Rate, Error, Duration) metrics
+# from ingested traces, enriched with attack-specific span dimensions.
+# This enables Prometheus-queryable metrics derived from trace data.
+trace_metrics:
+  enabled: true
+  description: >-
+    Tempo metrics_generator creates RED metrics from ingested traces.
+    Attack-specific dimensions (attack_team, attack_phase, attack_tool_name,
+    etc.) are extracted as metric labels, enabling PromQL queries like:
+    rate(traces_spanmetrics_calls_total{attack_team="red",attack_phase="credential_access"}[5m])
+  dimensions:
+    # Infrastructure
+    - service.name
+    - service.namespace
+    - host.name
+    - host.id
+    - deployment.environment
+    - deployment.name
+    # Attack context
+    - attack_team
+    - attack_phase
+    - attack_operation_id
+    - attack_operation_name
+    - attack_tool_name
+    - attack_tool_category
+    # Target context
+    - target.environment
+    - target_domain
+    - target_type
+    # Discovery
+    - discovery.type
+
+# ==============================================================================
+# Resource Attributes
+# ==============================================================================
+resource_attributes:
+  environment:
+    name: dreadgoad
+    version: "1.0.0"
+  infrastructure:
+    ad_forests:
+      - sevenkingdoms.local
+      - essos.local
+    ad_domains:
+      - sevenkingdoms.local
+      - north.sevenkingdoms.local
+      - essos.local
+    host_count: 5
+    domain_controller_count: 3
+
+# ==============================================================================
+# Agent Attributes
+# ==============================================================================
+agent_attributes:
+  red-orchestrator:
+    agent.name: red-orchestrator
+    agent.type: llm
+    agent.role: orchestrator
+    security.team: red
+  red-recon:
+    agent.name: red-recon
+    agent.type: llm
+    agent.role: specialist
+    security.team: red
+    mitre.tactic: TA0007
+  red-credential-access:
+    agent.name: red-credential-access
+    agent.type: llm
+    agent.role: specialist
+    security.team: red
+    mitre.tactic: TA0006
+  red-cracker:
+    agent.name: red-cracker
+    agent.type: llm
+    agent.role: specialist
+    security.team: red
+    mitre.tactic: TA0006
+  red-acl:
+    agent.name: red-acl
+    agent.type: llm
+    agent.role: specialist
+    security.team: red
+    mitre.tactic: TA0004
+  red-privesc:
+    agent.name: red-privesc
+    agent.type: llm
+    agent.role: specialist
+    security.team: red
+    mitre.tactic: TA0004
+  red-lateral:
+    agent.name: red-lateral
+    agent.type: llm
+    agent.role: specialist
+    security.team: red
+    mitre.tactic: TA0008
+  red-coercion:
+    agent.name: red-coercion
+    agent.type: llm
+    agent.role: specialist
+    security.team: red
+    mitre.tactic: TA0006
+  blue-orchestrator:
+    agent.name: blue-orchestrator
+    agent.type: llm
+    agent.role: orchestrator
+    security.team: blue
+  blue-triage:
+    agent.name: blue-triage
+    agent.type: llm
+    agent.role: triage
+    security.team: blue
+  blue-threat-hunter:
+    agent.name: blue-threat-hunter
+    agent.type: llm
+    agent.role: threat_hunter
+    security.team: blue
+  blue-lateral-analyst:
+    agent.name: blue-lateral-analyst
+    agent.type: llm
+    agent.role: lateral_analyst
+    security.team: blue
+
+# ==============================================================================
+# Span Dimensions
+# ==============================================================================
+span_dimensions:
+  infrastructure:
+    - service.name
+    - service.namespace
+    - service.version
+    - host.name
+    - host.id
+    - host.type
+    - deployment.environment
+    - deployment.name
+  experiment:
+    - experiment.name
+    - experiment.version
+    - experiment.phase
+    - agent.name
+    - agent.type
+    - agent.role
+    - agent.instance_id
+  security:
+    - security.team
+    - security.operation
+    - security.campaign
+    - mitre.tactic
+    - mitre.tactic.id
+    - mitre.technique.id
+    - mitre.technique.name
+    - attack.phase
+    - attack.vector
+    - attack.target.type
+    - detection.rule
+    - detection.severity
+    - detection.confidence
+    - credential.type
+    - credential.domain
+    - ad.domain
+    - ad.forest
+    - ad.object.type
+
+# ==============================================================================
+# Event Taxonomy
+# ==============================================================================
+event_taxonomy:
+  categories:
+    - agent
+    - action
+    - observation
+    - environment
+    - objective
+    - system
+
+  classes:
+    agent:
+      - agent.spawned
+      - agent.terminated
+      - agent.iteration
+      - agent.error
+      - agent.communication
+    action:
+      - action.started
+      - action.completed
+      - action.failed
+      - action.timeout
+    observation:
+      - observation.received
+      - observation.processed
+      - observation.insight
+    environment:
+      - environment.state_change
+      - environment.node_event
+      - environment.network_event
+      - environment.inject
+    objective:
+      - objective.achieved
+      - objective.failed
+      - objective.progress
+      - objective.evaluated
+    system:
+      - system.phase_started
+      - system.phase_ended
+      - system.checkpoint
+      - system.error
+    security_attack:
+      - security.attack.reconnaissance
+      - security.attack.initial_access
+      - security.attack.execution
+      - security.attack.persistence
+      - security.attack.privilege_escalation
+      - security.attack.credential_access
+      - security.attack.lateral_movement
+    security_defense:
+      - security.defense.alert
+      - security.defense.detection
+      - security.defense.response
+      - security.defense.investigation
+
+# ==============================================================================
+# Telemetry Tiering
+# ==============================================================================
+tiering:
+  active_tier: medium
+  rules:
+    low:
+      action.input: truncated_256
+      action.output: truncated_256
+      agent.decision.cot: omitted
+      agent.decision.env_state: omitted
+      action.tool_call_spans: omitted
+      raw_trace_artifacts: omitted
+      environment_events:
+        agent: [action.started, action.completed, action.failed]
+        infrastructure: [environment.state_change, objective.achieved, objective.failed]
+        security: [security.defense.alert]
+    medium:
+      action.input: included
+      action.output: included
+      agent.decision.cot: included
+      agent.decision.env_state: delta_only
+      action.tool_call_spans: included
+      raw_trace_artifacts: omitted
+      environment_events:
+        agent: all_tool_invocation_spans
+        infrastructure: standard_logs_ocsf
+        security: full_correlation_tracking
+    high:
+      action.input: untruncated
+      action.output: untruncated
+      agent.decision.cot: included
+      agent.decision.env_state: full_snapshot
+      action.tool_call_spans: included
+      raw_trace_artifacts: included
+      environment_events:
+        agent: all_data
+        infrastructure: dense_collection_with_pcap
+        security: comprehensive_evidence_artifacts
+
+# ==============================================================================
+# Agent Decision Records
+# ==============================================================================
+agent_decisions:
+  structure:
+    description: >-
+      Three-level span hierarchy for agent telemetry:
+      agent.decision.* → action.* → action.tool_call.*
+    levels:
+      - name: agent.decision
+        description: "One reasoning cycle — what the agent decided to do"
+        required_attributes:
+          - agent.decision.id
+          - agent.decision.agent
+          - agent.decision.timestamp
+          - agent.decision.objective_ref
+          - agent.decision.input
+          - agent.decision.cot
+        optional_attributes:
+          - agent.decision.environment_state
+          - agent.decision.outcome
+      - name: action
+        description: "One logical action — e.g., scan_and_sort_network"
+        required_attributes:
+          - action.id
+          - action.type
+          - action.status
+        optional_attributes:
+          - action.name
+          - action.input
+          - action.output
+          - action.duration_ms
+          - action.iteration
+          - action.role
+      - name: action.tool_call
+        description: "One tool invocation — e.g., nmap, certipy"
+        required_attributes:
+          - action.tool_call.id
+          - action.tool_call.name
+          - action.tool_call.arguments
+          - action.tool_call.timestamp
+          - action.tool_call.output
+          - action.tool_call.status
+        optional_attributes:
+          - action.tool_call.duration_ms
+
+# ==============================================================================
+# Correlation Patterns
+# ==============================================================================
+correlation:
+  identifiers:
+    - name: trace_id
+      scope: trace
+      description: "Links all spans in a trace"
+    - name: span_id
+      scope: span
+      description: "Unique span identifier"
+    - name: parent_span_id
+      scope: span
+      description: "Parent span for hierarchy"
+    - name: experiment_id
+      scope: experiment
+      description: "Links all telemetry in the experiment"
+    - name: correlation_id
+      scope: causal_chain
+      description: "Links causally-related events across agents and environment"
+    - name: action_id
+      scope: action
+      description: "Links an agent action to its environment effects"
+
+  patterns:
+    agent_action_to_environment:
+      description: >-
+        Links a red team agent action to the environment state change it
+        caused. Both events share the same correlation_id.
+      source_event: action.completed
+      target_event: environment.state_change
+      link_by: correlation_id
+
+    agent_action_to_telemetry:
+      description: >-
+        Links a red team action to the Windows Security Event Log entry
+        it generated on the target host.
+      source_event: action.tool.*
+      target_event: environment.node_event
+      link_by: action_id
+
+    multi_agent_red_coordination:
+      description: >-
+        Links task dispatch from the red orchestrator to worker agent
+        execution.
+      source_event: agent.communication
+      target_event: agent.communication
+      link_by: correlation_id
+
+    attack_to_detection:
+      description: >-
+        Links a red team attack action to a blue team detection alert.
+        Enables measuring time-to-detect and detection accuracy.
+      source_event: security.attack.*
+      target_event: security.defense.alert
+      link_by: correlation_id
+
+    objective_chain:
+      description: >-
+        Links the chain of actions that led to an objective being achieved.
+        All spans share the same trace_id showing the causal chain.
+      events: [action.tool.*, action.shell.*, objective.achieved]
+      link_by: trace_id
+
+# ==============================================================================
+# Dashboards (Deployed in Grafana)
+# ==============================================================================
+# 16 dashboards deployed as ConfigMaps with label grafana_dashboard: "1"
+dashboards:
+  # Attack simulation dashboards
+  attack-simulation-overview:
+    type: grafana
+    source: dashboards/attack-simulation-overview.json
+    datasources: [loki, tempo, prometheus]
+    description: "Attack campaign overview — operation status, phase progression, agent health"
+
+  attack-chain-traces:
+    type: grafana
+    source: dashboards/attack-chain-traces.json
+    datasources: [tempo]
+    description: "Distributed trace visualization for multi-step attack chains"
+
+  attack-operation-summary:
+    type: grafana
+    source: dashboards/attack-operation-summary.json
+    datasources: [loki, tempo, prometheus]
+    description: "Deep-dive into individual attack operations"
+
+  attack-graph:
+    type: grafana
+    source: dashboards/attack-graph.json
+    datasources: [loki, prometheus]
+    description: "Network traversal visualization using custom AttackGraph panel plugin"
+    plugins: [attack-graph-panel]
+
+  attack-target-network:
+    type: grafana
+    source: dashboards/attack-target-network.json
+    datasources: [prometheus]
+    description: "Target environment topology and host status"
+
+  attack-demo-live:
+    type: grafana
+    source: dashboards/attack-demo-live.json
+    datasources: [loki, tempo]
+    description: "Live attack demonstration view"
+
+  red-team-agent-logs:
+    type: grafana
+    source: dashboards/red-team-agent-logs.json
+    datasources: [loki]
+    description: "Red team agent activity logs and tool output"
+
+  blue-team-detection:
+    type: grafana
+    source: dashboards/blue-team-detection.json
+    datasources: [loki, prometheus]
+    description: "Blue team detection effectiveness — alerts, TTD, coverage"
+
+  # Platform operational dashboards
+  platform-dev-env-usage:
+    type: grafana
+    source: dashboards/platform-dev-env-usage.json
+    datasources: [prometheus]
+    description: "Resource utilization tracking"
+
+  platform-services:
+    type: grafana
+    source: dashboards/platform-services.json
+    datasources: [prometheus]
+    description: "Service health overview"
+
+  platform-uptime:
+    type: grafana
+    source: dashboards/platform-uptime.json
+    datasources: [prometheus]
+    description: "Availability tracking"
+
+  # Ray cluster dashboards
+  ray-default:
+    type: grafana
+    source: dashboards/ray-default.json
+    datasources: [prometheus]
+    description: "Ray cluster metrics"
+
+  ray-data:
+    type: grafana
+    source: dashboards/ray-data.json
+    datasources: [prometheus]
+    description: "Ray Data platform tracking"
+
+# ==============================================================================
+# Alert Rules (Deployed in Grafana)
+# ==============================================================================
+# 13 alert rule sets deployed as ConfigMaps with label grafana_alert: "1".
+# All rules use Loki as datasource with 1-minute evaluation interval.
+# Log source: job="windows-security" (Windows Security Event Log as JSON).
+# Every alert carries goad_ref and goad_vulnerability annotations linking
+# to specific DreadGOAD scenario vulnerabilities.
+alert_rules:
+  evaluation_interval: 1m
+  log_source: windows-security
+  datasource: loki
+
+  rulesets:
+    # ADCS certificate abuse (ESC1-ESC15)
+    adcs:
+      source: alert-rules/adcs-alerts.yaml
+      description: >-
+        ESC1-ESC15 detection: certificate template abuse, SAN spoofing,
+        relay to ADCS HTTP, shadow credentials, CA ACL abuse.
+      mitre_techniques:
+        - T1649   # Steal or Forge Authentication Certificates
+      goad_vulnerabilities:
+        - ESC1
+        - ESC4
+        - ESC6
+        - ESC7
+        - ESC8
+        - ESC10
+        - ESC11
+        - ESC13
+        - ESC15
+      windows_event_ids: [4886, 4887, 4888, 4899, 4900]
+
+    # Kerberos attacks
+    kerberos:
+      source: alert-rules/kerberos-attacks-alerts.yaml
+      description: >-
+        AS-REP roasting, Kerberoasting, golden ticket, silver ticket,
+        S4U delegation abuse, constrained delegation exploitation.
+      mitre_techniques:
+        - T1558       # Steal or Forge Kerberos Tickets
+        - T1558.003   # Kerberoasting
+        - T1558.004   # AS-REP Roasting
+        - T1558.001   # Golden Ticket
+      goad_vulnerabilities:
+        - asrep_roasting
+        - kerberoasting
+        - golden_ticket
+        - constrained_delegation
+        - unconstrained_delegation
+      windows_event_ids: [4768, 4769, 4771]
+
+    # Reconnaissance
+    reconnaissance:
+      source: alert-rules/reconnaissance-alerts.yaml
+      description: >-
+        LDAP enumeration, SMB share enumeration, SAMR user enumeration,
+        domain reconnaissance, BloodHound collection.
+      mitre_techniques:
+        - T1087   # Account Discovery
+        - T1069   # Permission Groups Discovery
+        - T1046   # Network Service Scanning
+        - T1135   # Network Share Discovery
+      windows_event_ids: [4624, 4661, 4662, 5140, 5145]
+
+    # Credential access
+    credential_access:
+      source: alert-rules/credential-access-alerts.yaml
+      description: >-
+        LSASS dumping, SAM extraction, LSA secrets harvesting,
+        DCSync (DS-Replication-Get-Changes), secretsdump.
+      mitre_techniques:
+        - T1003       # OS Credential Dumping
+        - T1003.001   # LSASS Memory
+        - T1003.002   # SAM
+        - T1003.004   # LSA Secrets
+        - T1003.006   # DCSync
+      windows_event_ids: [4624, 4662, 4672]
+
+    # Privilege escalation
+    privilege_escalation:
+      source: alert-rules/privilege-escalation-alerts.yaml
+      description: "Privilege escalation patterns including token manipulation"
+      mitre_techniques:
+        - T1134   # Access Token Manipulation
+        - T1068   # Exploitation for Privilege Escalation
+
+    # Lateral movement
+    lateral_movement:
+      source: alert-rules/lateral-movement-alerts.yaml
+      description: >-
+        PsExec, WMI, SMB, WinRM, DCOM lateral movement detection.
+        Pass-the-hash and pass-the-ticket.
+      mitre_techniques:
+        - T1021       # Remote Services
+        - T1021.002   # SMB/Windows Admin Shares
+        - T1021.003   # DCOM
+        - T1550       # Use Alternate Authentication Material
+        - T1550.002   # Pass the Hash
+      windows_event_ids: [4624, 4648]
+
+    # Delegation attacks
+    delegation:
+      source: alert-rules/delegation-alerts.yaml
+      description: >-
+        RBCD (Resource-Based Constrained Delegation), MAQ abuse,
+        unconstrained delegation exploitation.
+      mitre_techniques:
+        - T1558   # Steal or Forge Kerberos Tickets
+      goad_vulnerabilities:
+        - rbcd
+        - constrained_delegation
+        - unconstrained_delegation
+
+    # Coercion and relay
+    coercion_relay:
+      source: alert-rules/coercion-relay-alerts.yaml
+      description: >-
+        PrinterBug, PetitPotam, NTLM relay attacks, LLMNR/NBT-NS poisoning.
+      mitre_techniques:
+        - T1557       # Adversary-in-the-Middle
+        - T1557.001   # LLMNR/NBT-NS Poisoning
+        - T1187       # Forced Authentication
+
+    # Domain trust exploitation
+    domain_trust:
+      source: alert-rules/domain-trust-alerts.yaml
+      description: >-
+        Cross-domain trust exploitation, SID history injection,
+        inter-realm ticket forging.
+      mitre_techniques:
+        - T1134.005   # SID-History Injection
+      goad_vulnerabilities:
+        - cross_forest_trust
+        - sid_history
+
+    # Offensive tool detection
+    tool_detection:
+      source: alert-rules/tool-detection-alerts.yaml
+      description: >-
+        Detection of offensive tools: Mimikatz, Rubeus, Impacket,
+        BloodHound, Certipy, netexec, CrackMapExec.
+      mitre_techniques:
+        - T1059   # Command and Scripting Interpreter
+
+    # CVE-specific exploits
+    cve_exploits:
+      source: alert-rules/cve-exploits-alerts.yaml
+      description: >-
+        CVE-2022-26923 (Certifried), CVE-2021-42287 (noPac),
+        CVE-2021-1675 (PrintNightmare).
+      cves:
+        - CVE-2022-26923
+        - CVE-2021-42287
+        - CVE-2021-1675
+
+    # Multi-indicator correlation
+    correlation:
+      source: alert-rules/correlation-alerts.yaml
+      description: >-
+        Multi-indicator attack detection: Domain Admin achievement,
+        host compromise confirmation, attack chain correlation.
+      attack_phases:
+        - objective_achieved
+        - host_compromise
+        - domain_admin
+
+    # Infrastructure and networking
+    infrastructure:
+      source: alert-rules/infrastructure-networking-alerts.yaml
+      description: "Network connectivity, VPC endpoint health, DNS resolution"
+
+# ==============================================================================
+# Collection Point Semantics
+# ==============================================================================
+collection_semantics:
+  windows_security:
+    log_source_label: 'job="windows-security"'
+    format: json
+    description: >-
+      Windows Security Event Logs forwarded to Loki. All alert rules
+      parse these as JSON with LogQL. Events carry goad_ref annotations
+      linking detections to specific DreadGOAD vulnerabilities.
+    event_mappings:
+      4624:
+        ocsf_class: "Authentication [3002]"
+        description: "Successful logon"
+        attack_relevance: "Lateral movement (Type 3/10), initial access"
+        detection_use: [detect_lateral_movement, detect_pass_the_hash]
+      4625:
+        ocsf_class: "Authentication [3002]"
+        description: "Failed logon"
+        attack_relevance: "Brute force, credential spraying"
+        detection_use: [detect_brute_force]
+      4648:
+        ocsf_class: "Authentication [3002]"
+        description: "Explicit credential logon"
+        attack_relevance: "Runas, credential re-use"
+        detection_use: [detect_lateral_movement]
+      4661:
+        ocsf_class: "Entity Management [3004]"
+        description: "SAMR registry handle access"
+        attack_relevance: "User/group enumeration"
+        detection_use: [detect_user_enumeration]
+      4662:
+        ocsf_class: "Entity Management [3004]"
+        description: "AD object access"
+        attack_relevance: "DCSync (DS-Replication-Get-Changes), BloodHound"
+        detection_use: [detect_dcsync, detect_bloodhound_collection]
+      4672:
+        ocsf_class: "Authentication [3002]"
+        description: "Special privileges assigned to new logon"
+        attack_relevance: "Privilege escalation tracking"
+        detection_use: [detect_privilege_escalation]
+      4688:
+        ocsf_class: "Process Activity [1001]"
+        description: "Process creation"
+        attack_relevance: "Offensive tool execution"
+        detection_use: [detect_suspicious_execution]
+      4768:
+        ocsf_class: "Authentication [3002]"
+        description: "Kerberos TGT requested"
+        attack_relevance: "AS-REP roasting, golden ticket"
+        detection_use: [detect_asrep_roasting, detect_golden_ticket]
+      4769:
+        ocsf_class: "Authentication [3002]"
+        description: "Kerberos service ticket requested"
+        attack_relevance: "Kerberoasting, S4U delegation"
+        detection_use: [detect_kerberoasting, detect_delegation_abuse]
+      4771:
+        ocsf_class: "Authentication [3002]"
+        description: "Kerberos pre-auth failed"
+        attack_relevance: "AS-REP roasting indicator"
+        detection_use: [detect_asrep_roasting]
+      4776:
+        ocsf_class: "Authentication [3002]"
+        description: "NTLM credential validation"
+        attack_relevance: "Pass-the-hash detection"
+        detection_use: [detect_pass_the_hash]
+      4886:
+        ocsf_class: "Entity Management [3004]"
+        description: "Certificate request received"
+        attack_relevance: "ADCS ESC exploitation"
+        detection_use: [detect_adcs_exploitation]
+      4887:
+        ocsf_class: "Entity Management [3004]"
+        description: "Certificate request approved/issued"
+        attack_relevance: "ADCS ESC exploitation confirmation"
+        detection_use: [detect_certificate_authentication]
+      4888:
+        ocsf_class: "Entity Management [3004]"
+        description: "Certificate request denied"
+        attack_relevance: "Failed ADCS exploitation attempt"
+        detection_use: [detect_adcs_exploitation]
+      4899:
+        ocsf_class: "Entity Management [3004]"
+        description: "Certificate Services template updated"
+        attack_relevance: "ESC4/ESC5 template modification"
+        detection_use: [detect_adcs_exploitation]
+      4900:
+        ocsf_class: "Entity Management [3004]"
+        description: "Certificate Services security updated"
+        attack_relevance: "CA security modification (ESC7)"
+        detection_use: [detect_adcs_exploitation]
+      5136:
+        ocsf_class: "Entity Management [3004]"
+        description: "Directory service object modification"
+        attack_relevance: "ACL abuse, shadow credentials, RBCD"
+        detection_use: [detect_delegation_abuse]
+      5140:
+        ocsf_class: "File Activity [4001]"
+        description: "SMB network share accessed"
+        attack_relevance: "Share enumeration, lateral movement"
+        detection_use: [detect_share_enumeration, detect_smb_file_access]
+      5145:
+        ocsf_class: "File Activity [4001]"
+        description: "SMB file share detailed operations"
+        attack_relevance: "File access patterns, share spidering"
+        detection_use: [detect_share_enumeration]
+
+  mssql_audit:
+    format: json
+    description: >-
+      MSSQL audit logs from castelblack and braavos. Captures linked
+      server queries, xp_cmdshell execution, and impersonation.
+    detection_use: [detect_suspicious_execution, detect_impacket_secretsdump]
+
+  iis_access:
+    format: json
+    description: >-
+      IIS access logs from castelblack. Upload vulnerabilities and
+      WebDAV exploitation attempts.
+
+# ==============================================================================
+# Format Compatibility
+# ==============================================================================
+format_compatibility:
+  opentelemetry:
+    attribute_mappings:
+      agent.name: service.name
+      action.duration_ms: "duration (span field)"
+      target.address: net.peer.name
+      target.port: net.peer.port
+  ocsf:
+    event_mappings:
+      security.attack.credential_access: "Identity Activity / Authentication"
+      security.defense.alert: "Security Finding / Detection Finding"
+      environment.network_event: "Network Activity"
+      environment.node_event: "Discovery / Device Inventory"
+  ecs:
+    field_mappings:
+      agent.name: agent.name
+      target.address: destination.ip
+      target.port: destination.port
+      credential.username: user.name
+      credential.domain: user.domain

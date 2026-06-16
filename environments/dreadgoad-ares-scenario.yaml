@@ -1,0 +1,43 @@
+---
+apiVersion: aces.io/v1alpha1
+kind: Scenario
+metadata:
+  name: dreadgoad-ares-full-assault-scenario
+  description: >-
+    Named execution unit for the DreadGOAD Ares full assault experiment.
+    Purple team scenario: 8 red team Ares agents execute a full AD kill chain
+    across 3 domains while 4 blue team agents perform autonomous investigation.
+    Reset via full reprovision to ensure clean AD state between runs.
+  version: "1.0.0"
+  labels:
+    rfc: "0004"
+    domain: security
+    difficulty: expert
+    mode: purple
+    framework: ares
+    target: dreadgoad
+    ad.forests: "sevenkingdoms.local,essos.local"
+    estimated_duration: 2h
+    agent_count: "12"
+
+# ==============================================================================
+# Experiment Reference
+# ==============================================================================
+experiment:
+  ref:
+    name: dreadgoad-ares-full-assault
+    version: "1.0.0"
+  source: ./dreadgoad-ares-experiment.yaml
+
+# ==============================================================================
+# Reset Strategy
+# ==============================================================================
+# Full reprovision is required because the DreadGOAD AD environment contains
+# stateful vulnerabilities (ADCS templates, ACLs, credentials, group memberships)
+# that are modified during red team exploitation. Snapshot restore is insufficient
+# because:
+#   1. AD replication state may not be consistent at snapshot time
+#   2. Kerberos ticket caches and LAPS passwords rotate
+#   3. ADCS certificate enrollment state must be pristine
+#   4. MSSQL linked server credentials must be fresh
+reset_strategy: reprovision
