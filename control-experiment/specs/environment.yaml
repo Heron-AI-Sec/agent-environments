@@ -1,0 +1,132 @@
+---
+apiVersion: aces.io/v1alpha1
+kind: Environment
+metadata:
+  name: refactor-arena-sandbox
+  description: >-
+    Docker-based sandbox environment for AI control evaluations in a code
+    refactoring setting. Provides an isolated container with a cloned code
+    repository, language toolchains, and optional infrastructure features
+    (web proxy, database, killable processes) depending on the side task.
+    Built on the Inspect AI sandbox model and ControlArena framework.
+  version: "1.0.0"
+  labels:
+    rfc: "0001"
+    domain: software-security
+    project: refactor-arena
+    framework: control-arena
+    platform: docker
+    base_image: ubuntu-22.04
+
+# ==============================================================================
+# Topology
+# ==============================================================================
+# Single-node topology: one Docker container serving as the agent workspace.
+# Unlike multi-node network environments (e.g., DreadGOAD), Refactor Arena
+# operates within a single isolated sandbox containing a code repository.
+topology:
+  networks:
+    sandbox-net:
+      display_name: "Sandbox Network"
+      cidr: 172.17.0.0/16
+      routing: isolated
+
+  nodes:
+    sandbox-default:
+      type: container
+      display_name: "Default Sandbox Container"
+      os: linux
+      os_distribution: ubuntu
+      os_version: "22.04"
+      role: workspace
+      groups: [sandbox]
+      features: [python, web-proxy, killable-process, pytest-db-reset-plugin,
+                 pytest-fixed-salt-plugin]
+      labels:
+        entrypoint: /usr/local/bin/entrypoint.sh
+      network_interfaces:
+        - name: eth0
+          network: sandbox-net
+          dhcp: true
+
+# ==============================================================================
+# Groups
+# ==============================================================================
+groups:
+  sandbox:
+    display_name: "Agent Sandbox"
+    description: >-
+      Isolated Docker container with a code repository mounted at /workspace.
+      The agent operates as a non-root user with shell, Python, and editor
+      access.
+    type: functional
+    members: [sandbox-default]
+
+# ==============================================================================
+# Resources
+# ==============================================================================
+resources:
+  profiles:
+    sandbox-profile:
+      cpus: 4
+      memory: 8Gi
+      volume:
+        size: 10Gi
+
+  bindings:
+    sandbox-default:
+      profile: sandbox-profile
+
+# ==============================================================================
+# Provisioning
+# ==============================================================================
+# NOTE: RFC-0001 provisioning methods (cloud_shell_ansible, ssh_ansible,
+# cloud_init, none) do not include a Docker/container build method.
+# This environment uses docker-compose with per-sample container rebuilds.
+# GAP: RFC-0001 needs a container provisioning method that supports:
+#   - Dockerfile / Compose file references
+#   - Build-time feature selection
+#   - Per-sample workspace setup (copy repo files into container)
+provisioning:
+  method: x-docker-compose
+
+  templates:
+    compose:
+      path: ../sandboxes/default/compose.yaml
+      type: x-compose
+    dockerfile:
+      path: ../sandboxes/default/Dockerfile
+      type: x-dockerfile
+
+# ==============================================================================
+# Agent Platform
+# ==============================================================================
+# The agent platform provides tool support for LLM agents operating in the
+# sandbox. Tools are provided via Inspect AI's tool framework.
+# NOTE: RFC-0001 agent_platform does not support `tools` or `version`.
+# Available agent tools (bash, python, text_editor, think) are declared in
+# RFC-0002 via agents.*.actions.capabilities.
+agent_platform:
+  type: docker
+  name: refactor-arena-sandbox
+
+# ==============================================================================
+# Telemetry
+# ==============================================================================
+# Telemetry in Refactor Arena is captured via solver-based snapshots and
+# post-submission analysis rather than streaming infrastructure telemetry.
+# NOTE: RFC-0001 collection_points are designed for infrastructure telemetry
+# (syslog, journald, network_pcap, etc.). The evaluation-specific data
+# sources below (git diffs, agent trajectories, filesystem/database snapshots)
+# are better modeled as RFC-0002 observation sources.
+# GAP: RFC-0001 collection_points don't support evaluation-specific snapshot
+# types. These sources should be defined in RFC-0002 experiments that
+# reference this environment.
+telemetry:
+  collection_points: []
+
+# ==============================================================================
+# Connectivity
+# ==============================================================================
+# No inter-node connectivity required; single container environment
+connectivity: {}

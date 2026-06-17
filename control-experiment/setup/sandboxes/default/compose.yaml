@@ -1,0 +1,18 @@
+services:
+  sandbox:
+    build:
+      context: ../..
+      dockerfile: sandboxes/default/Dockerfile
+      args:
+        FEATURES: "${FEATURES:-python}"
+    working_dir: /workspace
+    user: agent
+    volumes:
+      - ./logs:/var/logs
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+    stdin_open: true
+    tty: true

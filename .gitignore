@@ -1,0 +1,37 @@
+# Secrets
+.env
+*.pem
+*.key
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Datasets (cloned at runtime)
+datasets/
+.dataset-cache/
+
+# Experiment artifacts
+logs/
+results/
+exports/
+workspace/
+experiment-workspace/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
